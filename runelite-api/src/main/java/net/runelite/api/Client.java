@@ -2325,4 +2325,104 @@ public interface Client extends OAuthApi, GameEngine
 	{
 		return getTopLevelWorldView().getSelectedSceneTile();
 	}
+
+	/**
+	 * Open RuneLite
+	 */
+
+	/**
+	 * Menu action
+	 *
+	 * For this to work it requires the runelite agent to create the method in client class
+	 *
+	 * @See MenuActionTransformer
+	 *
+	 *
+	 * @param param0
+	 * @param param1
+	 * @param opcode
+	 * @param identifier
+	 * @param itemId
+	 * @param worldViewId
+	 * @param option
+	 * @param target
+	 * @param x
+	 * @param y
+	 */
+	void menuAction(int param0, int param1, int opcode, int identifier, int itemId, int worldViewId, String option, String target, int x, int y);
+
+	default void invokeMenuAction(String option, String target, int identifier, int opcode, int param0, int param1, int itemId, int x, int y)
+	{
+		assert isClientThread() : "invokeMenuAction must be called on client thread";
+		menuAction(param0, param1, opcode, identifier, itemId, -1, option, target, x, y);
+	}
+
+	/*default void invokeMenuAction(String option, String target, int identifier, int opcode, int param0, int param1, int screenX, int screenY)
+	{
+		invokeMenuAction(option, target, identifier, opcode, param0, param1, getItemId(identifier, opcode, param0, param1, -1), screenX, screenY);
+	}
+
+	private static int getItemId(int identifier, int opcode, int param0, int param1, int currentItemId)
+	{
+		switch (opcode)
+		{
+			case 1006:
+				currentItemId = 0;
+				break;
+			case 25:
+			case 31:
+			case 32:
+			case 33:
+			case 34:
+			case 35:
+			case 36:
+			case 37:
+			case 38:
+			case 39:
+			case 40:
+			case 41:
+			case 42:
+			case 43:
+			case 58:
+			case 1005:
+				currentItemId = getItemId(param0, param1, currentItemId);
+				break;
+
+			case 57:
+			case 1007:
+				if (identifier >= 1 && identifier <= 10)
+				{
+					currentItemId = getItemId(param0, param1, currentItemId);
+				}
+
+				break;
+		}
+
+		return currentItemId;
+	}
+
+	private static int getItemId(int param0, int param1, int currentItemId)
+	{
+		Widget widget = client.getWidget(param1);
+		if (widget != null)
+		{
+			int group = param1 >>> 16;
+			Widget[] children = widget.getChildren();
+			if (children != null && children.length >= 2 && group == WidgetID.EQUIPMENT_GROUP_ID)
+			{
+				param0 = 1;
+			}
+
+			Widget child = widget.getChild(param0);
+			if (child != null)
+			{
+				if (currentItemId != child.getItemId())
+				{
+					return child.getItemId();
+				}
+			}
+		}
+
+		return currentItemId;
+	}*/
 }
