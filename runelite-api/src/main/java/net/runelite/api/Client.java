@@ -2330,6 +2330,9 @@ public interface Client extends OAuthApi, GameEngine
 	 * Open RuneLite
 	 */
 
+	boolean isPrintMenuActions();
+	void setPrintMenuActions(boolean printMenuActions);
+
 	/**
 	 * Menu action
 	 *
