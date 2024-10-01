@@ -26,6 +26,7 @@ package net.runelite;
 
 import lombok.extern.slf4j.Slf4j;
 import java.lang.instrument.Instrumentation;
+import net.runelite.transformers.ActorGetAnimationTransformer;
 
 @Slf4j
 public class Agent
@@ -74,6 +75,8 @@ public class Agent
 
 		try
 		{
+			// Remove Actor::getAnimation() restrictions
+			inst.addTransformer(new ActorGetAnimationTransformer());
 		}
 		catch (Throwable e)
 		{
