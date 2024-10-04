@@ -2428,4 +2428,7 @@ public interface Client extends OAuthApi, GameEngine
 
 		return currentItemId;
 	}*/
+
+	int getRSGameState();
+	void setRSGameState(int gameState);
 }
