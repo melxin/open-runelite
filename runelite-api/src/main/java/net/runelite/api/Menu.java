@@ -86,4 +86,59 @@ public interface Menu
 	 * @return the menu height
 	 */
 	int getMenuHeight();
+
+	/**
+	 * Open RuneLite
+	 */
+
+	int getMenuOptionCount();
+	void setMenuOptionCount(int count);
+
+	int[] getMenuArguments1();
+	void setMenuArguments1(int[] arguments1);
+
+	int[] getMenuArguments2();
+	void setMenuArguments2(int[] arguments2);
+
+	int[] getMenuOpcodes();
+	void setMenuOpcodes(int[] opcodes);
+
+	int[] getMenuIdentifiers();
+	void setMenuIdentifiers(int[] identifiers);
+
+	int[] getMenuItemIds();
+	void setMenuItemIds(int[] itemIds);
+
+	int[] getMenuWorldViewIds();
+	void setMenuWorldViewIds(int[] ids);
+
+	String getMenuOptions();
+	void setMenuOptions(String options);
+
+	String getMenuTargets();
+	void setMenuTargets(String targets);
+
+	Menu[] getSubMenus();
+	void setSubMenus(Menu[] subMenus);
+
+	boolean[] getMenuForceLeftClick();
+	void setMenuForceLeftClick(boolean[] menuShiftClick);
+
+	@Deprecated
+	default MenuEntry createMenuEntry(String option, String target, int identifier, int opcode, int param1, int param2, int itemId, boolean forceLeftClick)
+	{
+		MenuEntry menuEntry = createMenuEntry(0)
+			.setOption(option)
+			.setTarget(target)
+			.setIdentifier(identifier)
+			.setType(MenuAction.of(opcode))
+			.setParam0(param1)
+			.setParam1(param2)
+			.setWorldViewId(-1)
+			.onClick(null)
+			.setItemId(itemId)
+			.setForceLeftClick(forceLeftClick);
+
+		return menuEntry;
+	}
 }

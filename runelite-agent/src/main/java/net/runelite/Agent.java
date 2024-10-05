@@ -32,6 +32,7 @@ import net.runelite.transformers.client.LocalPlayerIndexTransformer;
 import net.runelite.transformers.client.RSGameStateTransformer;
 import net.runelite.transformers.MenuActionPrintTransformer;
 import net.runelite.transformers.MenuActionTransformer;
+import net.runelite.transformers.menu.MenuTransformer;
 
 @Slf4j
 public class Agent
@@ -97,6 +98,9 @@ public class Agent
 
 			// Create client::createWidget
 			inst.addTransformer(new CreateWidgetTransformer());
+
+			//Create menu setters and getters
+			inst.addTransformer(new MenuTransformer());
 		}
 		catch (Throwable e)
 		{
