@@ -2431,4 +2431,7 @@ public interface Client extends OAuthApi, GameEngine
 
 	int getRSGameState();
 	void setRSGameState(int gameState);
+
+	int getLocalPlayerIndex();
+	void setLocalPlayerIndex(int idx);
 }

@@ -27,6 +27,7 @@ package net.runelite;
 import lombok.extern.slf4j.Slf4j;
 import java.lang.instrument.Instrumentation;
 import net.runelite.transformers.ActorGetAnimationTransformer;
+import net.runelite.transformers.client.LocalPlayerIndexTransformer;
 import net.runelite.transformers.client.RSGameStateTransformer;
 import net.runelite.transformers.MenuActionPrintTransformer;
 import net.runelite.transformers.MenuActionTransformer;
@@ -89,6 +90,9 @@ public class Agent
 
 			// Create client::getRSGameState client::setRSGameState(int gameState)
 			inst.addTransformer(new RSGameStateTransformer());
+
+			// Create client::getLocalPlayerIndex client::setLocalPlayerIndex(int idx)
+			inst.addTransformer(new LocalPlayerIndexTransformer());
 		}
 		catch (Throwable e)
 		{
