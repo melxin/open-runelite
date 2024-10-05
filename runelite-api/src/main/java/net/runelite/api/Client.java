@@ -2330,6 +2330,11 @@ public interface Client extends OAuthApi, GameEngine
 	 * Open RuneLite
 	 */
 
+	default ItemComposition getItemComposition(int id)
+	{
+		return this.getItemDefinition(id);
+	}
+
 	boolean isPrintMenuActions();
 	void setPrintMenuActions(boolean printMenuActions);
 
@@ -2434,4 +2439,6 @@ public interface Client extends OAuthApi, GameEngine
 
 	int getLocalPlayerIndex();
 	void setLocalPlayerIndex(int idx);
+
+	Widget createWidget();
 }
