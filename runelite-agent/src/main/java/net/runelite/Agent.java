@@ -29,6 +29,7 @@ import java.lang.instrument.Instrumentation;
 import net.runelite.transformers.ActorGetAnimationTransformer;
 import net.runelite.transformers.client.CreateWidgetTransformer;
 import net.runelite.transformers.client.LocalPlayerIndexTransformer;
+import net.runelite.transformers.mousehandler.MouseHandlerTransformer;
 import net.runelite.transformers.client.RSGameStateTransformer;
 import net.runelite.transformers.MenuActionPrintTransformer;
 import net.runelite.transformers.MenuActionTransformer;
@@ -101,6 +102,9 @@ public class Agent
 
 			//Create menu setters and getters
 			inst.addTransformer(new MenuTransformer());
+
+			// Create mouse handler setters and getters
+			inst.addTransformer(new MouseHandlerTransformer());
 		}
 		catch (Throwable e)
 		{
