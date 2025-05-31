@@ -36,6 +36,7 @@ import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ClientShutdown;
+import net.runelite.client.plugins.openrl.Static;
 import net.runelite.client.util.RunnableExceptionLogger;
 
 @Singleton
@@ -61,6 +62,12 @@ public class ClientSessionManager
 
 	public void start()
 	{
+		if (Static.getOpenRuneLiteConfig().disableSession())
+		{
+			log.warn("Failed to start because session is disabled");
+			return;
+		}
+
 		executorService.execute(() ->
 		{
 			try
@@ -80,6 +87,11 @@ public class ClientSessionManager
 	@Subscribe
 	private void onClientShutdown(ClientShutdown e)
 	{
+		if (scheduledFuture == null)
+		{
+			return;
+		}
+
 		scheduledFuture.cancel(true);
 
 		e.waitFor(executorService.submit(() ->
