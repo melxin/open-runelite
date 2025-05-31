@@ -61,6 +61,7 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.PluginInstantiationException;
 import net.runelite.client.plugins.PluginManager;
+import net.runelite.client.plugins.openrl.external.OPRLExternalPluginManager;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.DynamicGridLayout;
 import net.runelite.client.ui.MultiplexingPluginPanel;
@@ -70,7 +71,7 @@ import net.runelite.client.util.Text;
 
 @Slf4j
 @Singleton
-class PluginListPanel extends PluginPanel
+public class PluginListPanel extends PluginPanel
 {
 	private static final String RUNELITE_GROUP_NAME = RuneLiteConfig.class.getAnnotation(ConfigGroup.class).value();
 	private static final String PINNED_PLUGINS_CONFIG_KEY = "pinnedPlugins";
@@ -82,7 +83,8 @@ class PluginListPanel extends PluginPanel
 		"Notification",
 		"Plugin Hub",
 		"Skilling",
-		"XP"
+		"XP",
+		"OPRLExternal"
 	);
 
 	private final ConfigManager configManager;
@@ -92,6 +94,7 @@ class PluginListPanel extends PluginPanel
 
 	@Getter
 	private final ExternalPluginManager externalPluginManager;
+	private final OPRLExternalPluginManager oprlExternalPluginManager;
 
 	@Getter
 	private final MultiplexingPluginPanel muxer;
@@ -106,6 +109,7 @@ class PluginListPanel extends PluginPanel
 		ConfigManager configManager,
 		PluginManager pluginManager,
 		ExternalPluginManager externalPluginManager,
+		OPRLExternalPluginManager oprlExternalPluginManager,
 		EventBus eventBus,
 		Provider<ConfigPanel> configPanelProvider)
 	{
@@ -114,6 +118,7 @@ class PluginListPanel extends PluginPanel
 		this.configManager = configManager;
 		this.pluginManager = pluginManager;
 		this.externalPluginManager = externalPluginManager;
+		this.oprlExternalPluginManager = oprlExternalPluginManager;
 		this.configPanelProvider = configPanelProvider;
 
 		muxer = new MultiplexingPluginPanel(this)
@@ -181,7 +186,7 @@ class PluginListPanel extends PluginPanel
 		add(scrollPane, BorderLayout.CENTER);
 	}
 
-	void rebuildPluginList()
+	public void rebuildPluginList()
 	{
 		final List<String> pinnedPlugins = getPinnedPluginNames();
 
@@ -211,7 +216,7 @@ class PluginListPanel extends PluginPanel
 		)
 			.map(desc ->
 			{
-				PluginListItem listItem = new PluginListItem(this, desc);
+				PluginListItem listItem = new PluginListItem(this, desc, oprlExternalPluginManager);
 				listItem.setPinned(pinnedPlugins.contains(desc.getName().replace(",", "")));
 				return listItem;
 			})
@@ -222,7 +227,7 @@ class PluginListPanel extends PluginPanel
 		refresh();
 	}
 
-	void addFakePlugin(PluginConfigurationDescriptor... descriptor)
+	public void addFakePlugin(PluginConfigurationDescriptor... descriptor)
 	{
 		Collections.addAll(fakePlugins, descriptor);
 	}
