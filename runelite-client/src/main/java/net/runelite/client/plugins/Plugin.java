@@ -28,13 +28,14 @@ import com.google.common.base.Strings;
 import com.google.inject.Binder;
 import com.google.inject.Injector;
 import com.google.inject.Module;
+import org.pf4j.ExtensionPoint;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import net.runelite.client.RuneLite;
 import net.runelite.client.util.Filepath;
 
-public abstract class Plugin implements Module
+public abstract class Plugin implements Module, ExtensionPoint
 {
 	protected Injector injector;
 
@@ -70,6 +71,11 @@ public abstract class Plugin implements Module
 	public final Injector getInjector()
 	{
 		return injector;
+	}
+
+	public void setInjector(Injector injector)
+	{
+		this.injector = injector;
 	}
 
 	public String getName()
