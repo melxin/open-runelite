@@ -27,8 +27,9 @@ package net.runelite.client.plugins;
 import com.google.inject.Binder;
 import com.google.inject.Injector;
 import com.google.inject.Module;
+import org.pf4j.ExtensionPoint;
 
-public abstract class Plugin implements Module
+public abstract class Plugin implements Module, ExtensionPoint
 {
 	protected Injector injector;
 
@@ -64,6 +65,11 @@ public abstract class Plugin implements Module
 	public final Injector getInjector()
 	{
 		return injector;
+	}
+
+	public void setInjector(Injector injector)
+	{
+		this.injector = injector;
 	}
 
 	public String getName()

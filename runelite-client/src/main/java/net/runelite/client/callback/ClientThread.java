@@ -26,9 +26,21 @@ package net.runelite.client.callback;
 
 import com.google.inject.Inject;
 import java.util.Iterator;
+import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import javax.inject.Singleton;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 
@@ -135,5 +147,142 @@ public class ClientThread
 				log.trace("Deferring task {}", r);
 			}
 		}
+	}
+
+	/**
+	 * Open RuneLite
+	 */
+
+	/**
+	 * Run a method on the client thread, returning the result.
+	 *
+	 * @param method
+	 * @param <T>
+	 * @return
+	 */
+	@SneakyThrows
+	@Deprecated(since = "1.7.9", forRemoval = true)
+	public <T> T runOnClientThread(Callable<T> method)
+	{
+		if (client.isClientThread())
+		{
+			return method.call();
+		}
+		final FutureTask<T> task = new FutureTask<>(method);
+		invoke(task);
+		try
+		{
+			return task.get(10000, TimeUnit.MILLISECONDS);
+		}
+		catch (InterruptedException | TimeoutException | ExecutionException e)
+		{
+			if (e instanceof InterruptedException)
+			{
+				Thread.currentThread().interrupt();
+				return null;
+			}
+			log.error("Exception during task execution: {}: {}", e.getClass().getSimpleName(), e.getMessage());
+			return null;
+		}
+	}
+
+	/**
+	 * Run a method on the client thread, returning an optional of the result.
+	 *
+	 * @param method
+	 * @param <T>
+	 * @return
+	 */
+	@SneakyThrows
+	public <T> Optional<T> runOnClientThreadOptional(Callable<T> method)
+	{
+		if (client.isClientThread())
+		{
+			try
+			{
+				return Optional.ofNullable(method.call());
+			}
+			catch (Exception e)
+			{
+				log.error("Exception in client thread execution: {}", e.getMessage());
+				return Optional.empty();
+			}
+		}
+		final FutureTask<T> task = new FutureTask<>(method);
+		invoke(task);
+		try
+		{
+			return Optional.ofNullable(task.get(10000, TimeUnit.MILLISECONDS));
+		}
+		catch (InterruptedException | TimeoutException | ExecutionException e)
+		{
+			if (e instanceof InterruptedException)
+			{
+				Thread.currentThread().interrupt();
+				return Optional.empty();
+			}
+			log.error("Exception during task execution: {}: {} {}", e.getClass().getSimpleName(), e.getMessage(), method);
+			return Optional.empty();
+		}
+	}
+
+	protected final ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
+	public Future<?> scheduledFuture;
+
+	/**
+	 * Run a method on a separate thread.
+	 *
+	 * @param method
+	 */
+	@SneakyThrows
+	public void runOnSeperateThread(Callable method)
+	{
+		if (scheduledFuture != null && !scheduledFuture.isDone()) return;
+		scheduledFuture = scheduledExecutorService.submit(() -> method.call());
+	}
+
+	public <T> T runOnClientThreadResult(Supplier<T> supplier)
+	{
+		return invoke(supplier);
+	}
+
+	public <T> T invoke(Supplier<T> supplier)
+	{
+		if (client.isClientThread())
+		{
+			return supplier.get();
+		}
+
+		final CompletableFuture<T> future = new CompletableFuture<>();
+		invoke(() ->
+		{
+			try
+			{
+				future.complete(supplier.get());
+			}
+			catch (Throwable t)
+			{
+				future.completeExceptionally(t);
+			}
+		});
+
+		try
+		{
+			return future.get(10, TimeUnit.SECONDS); // configurable timeout
+		}
+		catch (InterruptedException ie)
+		{
+			log.error("Interrupted waiting for client thread", ie);
+			Thread.currentThread().interrupt();
+		}
+		catch (TimeoutException te)
+		{
+			log.error("Timed out waiting for client thread", te);
+		}
+		catch (ExecutionException ee)
+		{
+			log.error("", ee);
+		}
+		return null;
 	}
 }

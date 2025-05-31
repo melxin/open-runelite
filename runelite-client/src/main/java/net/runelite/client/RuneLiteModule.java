@@ -26,6 +26,7 @@ package net.runelite.client;
 
 import com.google.common.base.Strings;
 import com.google.common.math.DoubleMath;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.gson.Gson;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
@@ -37,8 +38,12 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -56,9 +61,13 @@ import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.menus.MenuManager;
 import net.runelite.client.plugins.PluginManager;
+import net.runelite.client.plugins.openrl.OpenRuneLiteConfig;
+import net.runelite.client.plugins.openrl.Static;
+import net.runelite.client.plugins.openrl.api.movement.unethicalite.pathfinder.GlobalCollisionMap;
 import net.runelite.client.task.Scheduler;
 import net.runelite.client.util.DeferredEventBus;
 import net.runelite.client.util.ExecutorServiceExceptionLogger;
+import net.runelite.client.util.NonScheduledExecutorServiceExceptionLogger;
 import net.runelite.http.api.RuneLiteAPI;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
@@ -71,7 +80,7 @@ public class RuneLiteModule extends AbstractModule
 	private final RuntimeConfigLoader configLoader;
 	private final boolean developerMode;
 	private final boolean safeMode;
-	private final boolean disableTelemetry;
+	private final boolean enableTelemetry;
 	private final File sessionfile;
 	private final String profile;
 	private final boolean insecureWriteCredentials;
@@ -119,7 +128,7 @@ public class RuneLiteModule extends AbstractModule
 
 		bindConstant().annotatedWith(Names.named("developerMode")).to(developerMode);
 		bindConstant().annotatedWith(Names.named("safeMode")).to(safeMode);
-		bindConstant().annotatedWith(Names.named("disableTelemetry")).to(disableTelemetry);
+		bindConstant().annotatedWith(Names.named("enableTelemetry")).to(enableTelemetry);
 		bind(File.class).annotatedWith(Names.named("sessionfile")).toInstance(sessionfile);
 		bind(String.class).annotatedWith(Names.named("profile")).toProvider(Providers.of(profile));
 		bindConstant().annotatedWith(Names.named("insecureWriteCredentials")).to(insecureWriteCredentials);
@@ -145,6 +154,14 @@ public class RuneLiteModule extends AbstractModule
 		bind(EventBus.class)
 			.annotatedWith(Names.named("Deferred EventBus"))
 			.to(DeferredEventBus.class);
+
+		/**
+		 * Open RuneLite
+		 */
+
+		requestStaticInjection(
+			Static.class
+		);
 	}
 
 	@Provides
@@ -252,6 +269,37 @@ public class RuneLiteModule extends AbstractModule
 		Gson gson,
 		@Named("runelite.api.base") HttpUrl apiBase)
 	{
-		return disableTelemetry ? null : new TelemetryClient(okHttpClient, gson, apiBase);
+		return enableTelemetry ? new TelemetryClient(okHttpClient, gson, apiBase) : null;
+	}
+
+	@Provides
+	@Singleton
+	OpenRuneLiteConfig provideOpenRuneLiteConfig(ConfigManager configManager)
+	{
+		return configManager.getConfig(OpenRuneLiteConfig.class);
+	}
+
+	@Provides
+	@Singleton
+	GlobalCollisionMap provideGlobalCollisionMap() throws IOException
+	{
+		return GlobalCollisionMap.loadFromResources();
+	}
+
+	@Provides
+	@Singleton
+	ExecutorService provideExecutorService()
+	{
+		final int poolSize = 2 * Runtime.getRuntime().availableProcessors();
+
+		// Will start up to poolSize threads (because of allowCoreThreadTimeOut) as necessary, and times out
+		// unused threads after 1 minute
+		final ThreadPoolExecutor executor = new ThreadPoolExecutor(poolSize, poolSize,
+			60L, TimeUnit.SECONDS,
+			new LinkedBlockingQueue<>(),
+			new ThreadFactoryBuilder().setNameFormat("worker-%d").build());
+		executor.allowCoreThreadTimeOut(true);
+
+		return new NonScheduledExecutorServiceExceptionLogger(executor);
 	}
 }
