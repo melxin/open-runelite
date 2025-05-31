@@ -72,6 +72,7 @@ import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.input.KeyManager;
 import net.runelite.client.input.MouseManager;
+import net.runelite.client.plugins.openrl.api.events.Draw;
 import net.runelite.client.task.Scheduler;
 import net.runelite.client.ui.ClientUI;
 import net.runelite.client.ui.DrawManager;
@@ -384,6 +385,13 @@ public class Hooks implements Callbacks
 		}
 
 		final Graphics2D graphics2d = getGraphics(mainBufferProvider);
+
+		/**
+		 * Open RuneLite
+		 */
+		final Draw draw = Draw.getInstance();
+		draw.setGraphics(graphics2d);
+		eventBus.post(draw);
 
 		try
 		{
