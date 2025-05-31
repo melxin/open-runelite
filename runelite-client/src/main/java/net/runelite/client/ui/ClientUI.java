@@ -210,7 +210,8 @@ public class ClientUI
 		this.clientThreadProvider = clientThreadProvider;
 		this.eventBus = eventBus;
 		this.safeMode = safeMode;
-		this.title = title + (safeMode ? " (safe mode)" : "");
+		//this.title = title + (safeMode ? " (safe mode)" : "");
+		this.title = title + (safeMode ? " (safe mode)" : "") + (System.getProperty("socksProxyHost") != null && System.getProperty("socksProxyPort") != null ? String.format(" (%s)", System.getProperty("socksProxyHost") + ":" + System.getProperty("socksProxyPort")) : "");
 
 		normalBoundsTimer = new Timer(250, _ev -> setLastNormalBounds());
 		normalBoundsTimer.setRepeats(false);
