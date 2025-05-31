@@ -181,7 +181,7 @@ public class RuneLite
 		parser.accepts("jav_config", "jav_config url")
 			.withRequiredArg()
 			.defaultsTo(RuneLiteProperties.getJavConfig());
-		parser.accepts("disable-telemetry", "Disable telemetry");
+		parser.accepts("enable-telemetry", "Enable telemetry");
 		parser.accepts("profile", "Configuration profile to use").withRequiredArg();
 		parser.accepts("noupdate", "Skips the launcher update");
 
@@ -266,7 +266,7 @@ public class RuneLite
 				runtimeConfigLoader,
 				developerMode,
 				options.has("safe-mode"),
-				options.has("disable-telemetry"),
+				options.has("enable-telemetry"),
 				options.valueOf(sessionfile),
 				(String) options.valueOf("profile"),
 				options.has(insecureWriteCredentials),
@@ -377,6 +377,10 @@ public class RuneLite
 				telemetryClient.submitTelemetry();
 				telemetryClient.submitVmErrors(LOGS_DIR);
 			});
+		}
+		else
+		{
+			log.info("Telemetry is disabled!");
 		}
 
 		ReflectUtil.queueInjectorAnnotationCacheInvalidation(injector);

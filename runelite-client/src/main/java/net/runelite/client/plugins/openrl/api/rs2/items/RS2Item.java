@@ -1,0 +1,195 @@
+package net.runelite.client.plugins.openrl.api.rs2.items;
+
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NonNull;
+import lombok.RequiredArgsConstructor;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import javax.annotation.Nullable;
+import net.runelite.api.Item;
+import net.runelite.api.ItemComposition;
+import net.runelite.api.MenuAction;
+import net.runelite.api.Point;
+import net.runelite.api.gameval.InterfaceID;
+import net.runelite.api.widgets.Widget;
+import net.runelite.api.widgets.WidgetItem;
+import net.runelite.client.plugins.openrl.Static;
+import net.runelite.client.plugins.openrl.api.events.MenuAutomated;
+import net.runelite.client.plugins.openrl.api.input.utils.Randomizer;
+
+@RequiredArgsConstructor
+public class RS2Item
+{
+	@NonNull
+	@Getter(AccessLevel.PUBLIC)
+	private final Item item;
+
+	@Getter(AccessLevel.PUBLIC)
+	private final int slot;
+
+	public int getId()
+	{
+		return item.getId();
+	}
+
+	public int getQuantity()
+	{
+		return item.getQuantity();
+	}
+
+	@Nullable
+	public String getName()
+	{
+		final ItemComposition composition = getComposition();
+		return composition != null ? composition.getName() : null;
+	}
+
+	private ItemComposition itemComposition;
+
+	@Nullable
+	public ItemComposition getComposition()
+	{
+		if (itemComposition == null)
+		{
+			this.itemComposition = Static.getGameDataCached().getItemComposition(getId());
+		}
+		return itemComposition;
+	}
+
+	public void interact(int index)
+	{
+		interact(getAction(index));
+	}
+
+	public void interact(String action)
+	{
+		final WidgetItem widgetItem = getWidgetItem();
+		final Widget widget = widgetItem.getWidget();
+		final int param0 = getSlot();
+		final int param1 = widget.getId();
+		final MenuAction menuAction = getMenuAction(action);
+		final String[] actions = widget.getActions();
+		final int actionIndex = Arrays.asList(stripColTags(actions)).indexOf(action) + 1;
+		final int itemId = widget.getItemId();
+		final int worldViewId = -1;
+		final String option = action;
+		final String target = "<col=ff9040>" + this.getName() + "</col>";
+		final Point clickPoint = getClickPoint();
+		final int x = clickPoint.getX();
+		final int y = clickPoint.getY();
+		Static.getEventBus().post(new MenuAutomated(param0, param1, menuAction, actionIndex, itemId, worldViewId, option, target, x, y));
+	}
+
+	public WidgetItem getWidgetItem()
+	{
+		final Widget inventoryWidget = Static.getClient().getWidget(InterfaceID.Inventory.ITEMS);
+		if (inventoryWidget == null || !inventoryWidget.isIf3())
+		{
+			return null;
+		}
+
+		final Widget item = inventoryWidget.getChild(getSlot());
+		return new WidgetItem(item.getItemId(), item.getItemQuantity(), item.getBounds(), item, item.getBounds());
+	}
+
+	/**
+	 * Checks whether an item is currently selected in your inventory.
+	 *
+	 * @return True if an item is selected, false otherwise.
+	 */
+	public boolean isItemSelected()
+	{
+		return Static.getClient().isWidgetSelected();
+	}
+
+	private String[] stripColTags(String[] sourceList)
+	{
+		List<String> resultList = new ArrayList<>();
+		String regex = "<col=[^>]*>";
+
+		for (String item : sourceList)
+		{
+			if (item != null)
+			{
+				resultList.add(item.replaceAll(regex, ""));
+			}
+			else
+			{
+				resultList.add(null);
+			}
+		}
+
+		return resultList.toArray(String[]::new);
+	}
+
+	public String[] getActions()
+	{
+		final WidgetItem widgetItem = getWidgetItem();
+		final Widget widget = widgetItem.getWidget();
+		final String[] actions = Arrays.stream(widget.getActions())
+			.filter(a -> a != null && !a.equals("null"))
+			.toArray(String[]::new);
+		return actions;
+	}
+
+	public String getAction(int index)
+	{
+		final String[] actions = getActions();
+
+		if (index >= 0 && index < actions.length)
+		{
+			return actions[index];
+		}
+		return "null";
+	}
+
+	public int getActionIndex(String action)
+	{
+		return Arrays.asList(getActions()).indexOf(action);
+	}
+
+	public boolean hasAction(String action)
+	{
+		final WidgetItem widgetItem = getWidgetItem();
+		if (widgetItem == null)
+		{
+			return false;
+		}
+
+		final Widget widget = widgetItem.getWidget();
+		if (widget == null)
+		{
+			return false;
+		}
+
+		final String[] actions = widget.getActions();
+		return actions != null && Arrays.asList(actions).contains(action);
+	}
+
+	public MenuAction getMenuAction(String action)
+	{
+		final MenuAction menuAction = isItemSelected() ? MenuAction.WIDGET_TARGET_ON_WIDGET
+			: action.equalsIgnoreCase("use") ? MenuAction.WIDGET_TARGET
+			: action.equalsIgnoreCase("cast") ? MenuAction.WIDGET_TARGET_ON_WIDGET
+			: MenuAction.CC_OP;
+		return menuAction;
+	}
+
+	public Point getClickPoint()
+	{
+		final WidgetItem widgetItem = getWidgetItem();
+		if (widgetItem == null)
+		{
+			return null;
+		}
+		final Widget widget = widgetItem.getWidget();
+		return widget != null ? Randomizer.getRandomPointIn(widget.getBounds()) : null;
+	}
+
+	public boolean isPlaceholder()
+	{
+		return getComposition().getPlaceholderTemplateId() > -1;
+	}
+}
