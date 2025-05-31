@@ -1,0 +1,5 @@
+Main class: net.runelite.client.RuneLite
+
+VM options: -ea -javaagent:/home/melxin/Documents/runescape/open-runelite/runelite-agent/build/libs/runelite-agent-1.0-all.jar --add-opens="java.base/java.lang.reflect=ALL-UNNAMED"
+
+Program arguments: --developer-mode

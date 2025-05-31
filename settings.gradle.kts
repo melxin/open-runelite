@@ -36,3 +36,9 @@ apply(from = "./common.settings.gradle.kts")
 includeBuild("cache")
 includeBuild("runelite-api")
 includeBuild("runelite-gradle-plugin")
+
+include("deobfuscator")
+project(":deobfuscator").projectDir = file("./deobfuscator")
+
+include("runelite-agent")
+project(":runelite-agent").projectDir = file("./runelite-agent")
