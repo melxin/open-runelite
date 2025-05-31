@@ -36,6 +36,8 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
+import java.net.Authenticator;
+import java.net.PasswordAuthentication;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -80,6 +82,7 @@ import net.runelite.client.discord.DiscordService;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.externalplugins.ExternalPluginManager;
 import net.runelite.client.plugins.PluginManager;
+import net.runelite.client.plugins.openrl.external.OPRLExternalPluginManager;
 import net.runelite.client.rs.ClientLoader;
 import net.runelite.client.ui.ClientUI;
 import net.runelite.client.ui.FatalErrorDialog;
@@ -118,6 +121,9 @@ public class RuneLite
 
 	@Inject
 	private ExternalPluginManager externalPluginManager;
+
+	@Inject
+	private OPRLExternalPluginManager oprlExternalPluginManager;
 
 	@Inject
 	private EventBus eventBus;
@@ -169,7 +175,7 @@ public class RuneLite
 		parser.accepts("jav_config", "jav_config url")
 			.withRequiredArg()
 			.defaultsTo(RuneLiteProperties.getJavConfig());
-		parser.accepts("disable-telemetry", "Disable telemetry");
+		parser.accepts("enable-telemetry", "Enable telemetry");
 		parser.accepts("profile", "Configuration profile to use").withRequiredArg();
 		parser.accepts("noupdate", "Skips the launcher update");
 
@@ -177,6 +183,10 @@ public class RuneLite
 			.withRequiredArg()
 			.withValuesConvertedBy(new ConfigFileConverter())
 			.defaultsTo(DEFAULT_SESSION_FILE);
+
+		final ArgumentAcceptingOptionSpec<String> proxyInfo = parser
+			.accepts("proxy")
+			.withRequiredArg().ofType(String.class);
 
 		final OptionSpec<Void> insecureWriteCredentials = parser.accepts("insecure-write-credentials", "Dump authentication tokens from the Jagex Launcher to a text file to be used for development");
 
@@ -193,6 +203,37 @@ public class RuneLite
 		{
 			final Logger logger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
 			logger.setLevel(Level.DEBUG);
+		}
+
+		if (options.has("proxy"))
+		{
+			final String[] proxy = options.valueOf(proxyInfo).split(":");
+
+			if (proxy.length >= 2)
+			{
+				System.setProperty("socksProxyHost", proxy[0]);
+				System.setProperty("socksProxyPort", proxy[1]);
+			}
+
+			if (proxy.length >= 4)
+			{
+				System.setProperty("java.net.socks.username", proxy[2]);
+				System.setProperty("java.net.socks.password", proxy[3]);
+
+				final String user = proxy[2];
+				final char[] pass = proxy[3].toCharArray();
+
+				Authenticator.setDefault(new Authenticator()
+				{
+					private final PasswordAuthentication auth = new PasswordAuthentication(user, pass);
+
+					@Override
+					protected PasswordAuthentication getPasswordAuthentication()
+					{
+						return auth;
+					}
+				});
+			}
 		}
 
 		Thread.setDefaultUncaughtExceptionHandler((thread, throwable) ->
@@ -254,7 +295,7 @@ public class RuneLite
 				runtimeConfigLoader,
 				developerMode,
 				options.has("safe-mode"),
-				options.has("disable-telemetry"),
+				options.has("enable-telemetry"),
 				options.valueOf(sessionfile),
 				(String) options.valueOf("profile"),
 				options.has(insecureWriteCredentials),
@@ -309,11 +350,22 @@ public class RuneLite
 		Updater updater = injector.getInstance(Updater.class);
 		updater.update(); // will exit if an update is in progress
 
+		// Load open runelite external plugin manager
+		oprlExternalPluginManager.setupInstance();
+		oprlExternalPluginManager.startExternalUpdateManager();
+		oprlExternalPluginManager.startExternalPluginManager();
+
+		// Update open runelite external plugins
+		oprlExternalPluginManager.update();
+
 		// Load the plugins, but does not start them yet.
 		// This will initialize configuration
 		pluginManager.loadCorePlugins();
 		pluginManager.loadSideLoadPlugins();
 		externalPluginManager.loadExternalPlugins();
+
+		// Load open runelite external plugins
+		oprlExternalPluginManager.loadPlugins();
 
 		SplashScreen.stage(.70, null, "Finalizing configuration");
 
@@ -360,6 +412,10 @@ public class RuneLite
 				telemetryClient.submitTelemetry();
 				telemetryClient.submitVmErrors(LOGS_DIR);
 			});
+		}
+		else
+		{
+			log.info("Telemetry is disabled!");
 		}
 
 		ReflectUtil.queueInjectorAnnotationCacheInvalidation(injector);
