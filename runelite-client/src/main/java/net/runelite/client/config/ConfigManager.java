@@ -47,6 +47,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -57,6 +58,7 @@ import java.util.WeakHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -84,6 +86,8 @@ import net.runelite.client.events.ProfileChanged;
 import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.events.SessionClose;
 import net.runelite.client.events.SessionOpen;
+import net.runelite.client.plugins.Plugin;
+import net.runelite.client.plugins.openrl.external.OPRLExternalPluginManager;
 import net.runelite.client.util.ColorUtil;
 import net.runelite.client.util.RunnableExceptionLogger;
 import net.runelite.http.api.config.ConfigPatch;
@@ -120,6 +124,8 @@ public class ConfigManager
 	private final SessionManager sessionManager;
 
 	private final ConfigInvocationHandler handler = new ConfigInvocationHandler(this);
+
+	private final Map<String, Consumer<? super Plugin>> consumers = new HashMap<>();
 
 	@Getter
 	private ConfigProfile profile;
@@ -495,6 +501,8 @@ public class ConfigManager
 
 	public void load()
 	{
+		consumers.clear();
+
 		AccountSession session = sessionManager.getAccountSession();
 		List<Profile> remoteProfiles = Collections.emptyList();
 		if (session != null)
@@ -925,6 +933,12 @@ public class ConfigManager
 
 	public <T> void setConfiguration(String groupName, String key, T value)
 	{
+		// do not save consumers for buttons, they cannot be changed anyway
+		if (value instanceof Consumer)
+		{
+			return;
+		}
+
 		setConfiguration(groupName, null, key, value);
 	}
 
@@ -1055,6 +1069,30 @@ public class ConfigManager
 				.result())
 			.collect(Collectors.toList());
 
+		final List<ConfigTitleDescriptor> titles = Arrays.stream(inter.getDeclaredFields())
+				.filter(m -> m.isAnnotationPresent(ConfigTitle.class) && m.getType() == String.class)
+				.map(m ->
+				{
+					try
+					{
+						return new ConfigTitleDescriptor(
+								String.valueOf(m.get(inter)),
+								m.getDeclaredAnnotation(ConfigTitle.class)
+						);
+					}
+					catch (IllegalAccessException e)
+					{
+						log.warn("Unable to load title {}::{}", inter.getSimpleName(), m.getName());
+						return null;
+					}
+				})
+				.filter(Objects::nonNull)
+				.sorted((a, b) -> ComparisonChain.start()
+						.compare(a.getTitle().position(), b.getTitle().position())
+						.compare(a.getTitle().name(), b.getTitle().name())
+						.result())
+				.collect(Collectors.toList());
+
 		final List<ConfigItemDescriptor> items = Arrays.stream(inter.getMethods())
 			.filter(m -> m.getParameterCount() == 0 && m.isAnnotationPresent(ConfigItem.class))
 			.map(m -> new ConfigItemDescriptor(
@@ -1070,7 +1108,7 @@ public class ConfigManager
 				.result())
 			.collect(Collectors.toList());
 
-		return new ConfigDescriptor(group, sections, items);
+		return new ConfigDescriptor(group, sections, titles, items);
 	}
 
 	/**
@@ -1098,7 +1136,23 @@ public class ConfigManager
 				continue;
 			}
 
-			if (!method.isDefault())
+			if (method.getReturnType().isAssignableFrom(Consumer.class))
+			{
+				Object defaultValue;
+				try
+				{
+					defaultValue = ConfigInvocationHandler.callDefaultMethod(proxy, method, null);
+				}
+				catch (Throwable ex)
+				{
+					log.warn(null, ex);
+					continue;
+				}
+
+				log.debug("Registered consumer: {}.{}", group.value(), item.keyName());
+				consumers.put(group.value() + "." + item.keyName(), (Consumer) defaultValue);
+			}
+			else if (!method.isDefault())
 			{
 				if (override)
 				{
@@ -1266,6 +1320,40 @@ public class ConfigManager
 				return serializer.deserialize(str);
 			}
 		}
+		if (type == EnumSet.class)
+		{
+			try
+			{
+				String substring = str.substring(str.indexOf("{") + 1, str.length() - 1);
+				String[] splitStr = substring.split(", ");
+				Class<? extends Enum> enumClass = null;
+				if (!str.contains("{"))
+				{
+					return null;
+				}
+
+				enumClass = findEnumClass(str, OPRLExternalPluginManager.pluginClassLoaders);
+
+				EnumSet enumSet = EnumSet.noneOf(enumClass);
+				for (String s : splitStr)
+				{
+					try
+					{
+						enumSet.add(Enum.valueOf(enumClass, s.replace("[", "").replace("]", "")));
+					}
+					catch (IllegalArgumentException ignore)
+					{
+						return EnumSet.noneOf(enumClass);
+					}
+				}
+				return enumSet;
+			}
+			catch (Exception e)
+			{
+				log.error("", e);
+				return null;
+			}
+		}
 		return str;
 	}
 
@@ -1317,6 +1405,15 @@ public class ConfigManager
 		{
 			return Base64.getUrlEncoder().encodeToString((byte[]) object);
 		}
+		if (object instanceof EnumSet)
+		{
+			if (((EnumSet) object).size() == 0)
+			{
+				return getElementType((EnumSet) object).getCanonicalName() + "{}";
+			}
+
+			return ((EnumSet) object).toArray()[0].getClass().getCanonicalName() + "{" + object.toString() + "}";
+		}
 		if (object instanceof Set)
 		{
 			return gson.toJson(object, Set.class);
@@ -1339,6 +1436,59 @@ public class ConfigManager
 			}
 		}
 		return object == null ? null : object.toString();
+	}
+
+	public static <T extends Enum<T>> Class<T> getElementType(EnumSet<T> enumSet)
+	{
+		if (enumSet.isEmpty())
+		{
+			enumSet = EnumSet.complementOf(enumSet);
+		}
+		return enumSet.iterator().next().getDeclaringClass();
+	}
+
+	public static Class<? extends Enum> findEnumClass(String clazz, ArrayList<ClassLoader> classLoaders)
+	{
+		StringBuilder transformedString = new StringBuilder();
+		for (ClassLoader cl : classLoaders)
+		{
+			try
+			{
+				String[] strings = clazz.substring(0, clazz.indexOf("{")).split("\\.");
+				int i = 0;
+				while (i != strings.length)
+				{
+					if (i == 0)
+					{
+						transformedString.append(strings[i]);
+					}
+					else if (i == strings.length - 1)
+					{
+						transformedString.append('$').append(strings[i]);
+					}
+					else
+					{
+						transformedString.append('.').append(strings[i]);
+					}
+					i++;
+				}
+				return (Class<? extends Enum>) cl.loadClass(transformedString.toString());
+			}
+			catch (Exception e2)
+			{
+				// Will likely fail a lot
+			}
+			try
+			{
+				return (Class<? extends Enum>) cl.loadClass(clazz.substring(0, clazz.indexOf("{")));
+			}
+			catch (Exception e)
+			{
+				// Will likely fail a lot
+			}
+			transformedString = new StringBuilder();
+		}
+		throw new RuntimeException("Failed to find Enum for " + clazz.substring(0, clazz.indexOf("{")));
 	}
 
 	@Subscribe(
@@ -1645,5 +1795,13 @@ public class ConfigManager
 			key = key.substring(i + 1);
 		}
 		return new String[]{group, profile, key};
+	}
+
+	/**
+	 * Retrieves a consumer from config group and key name
+	 */
+	public Consumer<? super Plugin> getConsumer(final String configGroup, final String keyName)
+	{
+		return consumers.getOrDefault(configGroup + "." + keyName, (p) -> log.error("Failed to retrieve consumer with name {}.{}", configGroup, keyName));
 	}
 }

@@ -40,7 +40,8 @@ import net.runelite.client.task.Schedule;
 
 @PluginDescriptor(
 	name = "OSRS Wiki Crowdsourcing",
-	description = "Send data to the wiki to help figure out skilling success rates, burn rates, more. See osrs.wiki/RS:CROWD"
+	description = "Send data to the wiki to help figure out skilling success rates, burn rates, more. See osrs.wiki/RS:CROWD",
+	enabledByDefault = false
 )
 public class CrowdsourcingPlugin extends Plugin
 {

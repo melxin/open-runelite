@@ -30,6 +30,7 @@ import java.awt.Container;
 import java.awt.EventQueue;
 import java.awt.SecondaryLoop;
 import java.awt.Toolkit;
+import java.lang.reflect.InvocationTargetException;
 import javax.annotation.Nullable;
 import javax.swing.AbstractButton;
 import javax.swing.SwingUtilities;
@@ -130,6 +131,21 @@ public class SwingUtil
 			{
 				log.warn("uncaught exception in deactivate", e);
 			}
+		}
+	}
+
+	/**
+	 * Executes a runnable on the EDT, blocking until it finishes.
+	 */
+	public static void syncExec(final Runnable r) throws InvocationTargetException, InterruptedException
+	{
+		if (EventQueue.isDispatchThread())
+		{
+			r.run();
+		}
+		else
+		{
+			EventQueue.invokeAndWait(r);
 		}
 	}
 }
