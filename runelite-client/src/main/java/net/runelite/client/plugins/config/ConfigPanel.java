@@ -30,6 +30,7 @@ import com.google.common.collect.ComparisonChain;
 import com.google.common.collect.Sets;
 import com.google.common.primitives.Ints;
 import java.awt.BorderLayout;
+import java.awt.Button;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -75,6 +76,7 @@ import javax.swing.border.MatteBorder;
 import javax.swing.event.ChangeListener;
 import javax.swing.text.JTextComponent;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.events.ConfigButtonClicked;
 import net.runelite.client.config.ConfigDescriptor;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -95,6 +97,7 @@ import net.runelite.client.events.ProfileChanged;
 import net.runelite.client.externalplugins.ExternalPluginManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginManager;
+import net.runelite.client.plugins.openrl.Static;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.DynamicGridLayout;
 import net.runelite.client.ui.FontManager;
@@ -397,6 +400,14 @@ class ConfigPanel extends PluginPanel
 				{
 					item.add(createList(cd, cid), BorderLayout.EAST);
 				}
+			}
+			/**
+			 * Open RuneLite
+			 */
+			else if (cid.getType() == Button.class)
+			{
+				item.remove(configEntryName);
+				item.add(createButton(cd, cid), BorderLayout.CENTER);
 			}
 
 			JPanel section = sectionWidgets.get(cid.getItem().section());
@@ -729,6 +740,23 @@ class ConfigPanel extends PluginPanel
 		});
 
 		return list;
+	}
+
+	/**
+	 * Open RuneLite
+	 */
+	private JButton createButton(ConfigDescriptor cd, ConfigItemDescriptor cid)
+	{
+		JButton button = new JButton(cid.name());
+		button.addActionListener((e) ->
+		{
+			ConfigButtonClicked event = new ConfigButtonClicked();
+			event.setGroup(cd.getGroup().value());
+			event.setKey(cid.getItem().keyName());
+			Static.getEventBus().post(event);
+		});
+
+		return button;
 	}
 
 	private void changeConfiguration(Component component, ConfigDescriptor cd, ConfigItemDescriptor cid)
