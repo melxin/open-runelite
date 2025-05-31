@@ -40,4 +40,12 @@ public @interface ConfigSection
 	int position();
 
 	boolean closedByDefault() default false;
+
+	/*
+	Open RuneLite Lazy Helpers tm
+	 */
+	String keyName() default "";
+	String section() default "";
+	boolean hidden() default false;
+	String unhide() default "";
 }
