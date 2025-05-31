@@ -31,6 +31,13 @@ import java.awt.Color;
  */
 public class ColorScheme
 {
+	/* Open RuneLite */
+	public static final Color BLUE = new Color(25, 194, 255);
+	public static final Color BLUE_TRANSPARENT = new Color(25, 194, 255, 120);
+
+	public static final Color GREEN = new Color(0, 255, 29, 252);
+	public static final Color GREEN_TRANSPARENT = new Color(0, 255, 13, 120);
+
 	/* The orange color used for the branding's accents */
 	public static final Color BRAND_ORANGE = new Color(220, 138, 0);
 
