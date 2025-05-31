@@ -1,0 +1,288 @@
+package net.runelite.client.plugins.openrl.api.movement.unethicalite.pathfinder;
+
+import lombok.Data;
+import lombok.Value;
+import lombok.extern.slf4j.Slf4j;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
+import net.runelite.api.EquipmentInventorySlot;
+import net.runelite.api.ItemID;
+import net.runelite.api.coords.LocalPoint;
+import net.runelite.api.coords.WorldArea;
+import net.runelite.api.coords.WorldPoint;
+import net.runelite.client.plugins.openrl.Static;
+import net.runelite.client.plugins.openrl.api.movement.unethicalite.pathfinder.model.CharterShipLocation;
+import net.runelite.client.plugins.openrl.api.movement.unethicalite.pathfinder.model.Transport;
+import net.runelite.client.plugins.openrl.api.rs2.providers.items.RS2Equipment;
+import net.runelite.client.plugins.openrl.api.rs2.providers.items.RS2Inventory;
+import net.runelite.client.plugins.openrl.api.rs2.wrappers.RS2Item;
+import static net.runelite.client.plugins.openrl.api.movement.unethicalite.pathfinder.model.MovementConstants.FEROX_ENCLAVE;
+import static net.runelite.client.plugins.openrl.api.movement.unethicalite.pathfinder.model.MovementConstants.WILDERNESS_ABOVE_GROUND;
+import static net.runelite.client.plugins.openrl.api.movement.unethicalite.pathfinder.model.MovementConstants.WILDERNESS_UNDERGROUND;
+
+@Data
+@Slf4j
+public class Pathfinder implements Callable<List<WorldPoint>>
+{
+	final CollisionMap map;
+	final Map<WorldPoint, List<Transport>> transports;
+	private List<Node> start;
+	private WorldArea target;
+	private List<WorldPoint> targetTiles;
+	private final List<Node> boundary = new LinkedList<>();
+	private final Set<WorldPoint> visited = new HashSet<>();
+	private Node nearest;
+	boolean avoidWilderness;
+	boolean useCharterShips;
+	private int goldAvailable = 0;
+	private boolean ringOfCharosEquipped;
+	private boolean targetsInWilderness;
+
+	private static boolean isInWilderness(WorldPoint location)
+	{
+
+		return contains(location, WILDERNESS_ABOVE_GROUND, WILDERNESS_UNDERGROUND) &&
+			!contains(location, FEROX_ENCLAVE);
+	}
+
+	private static boolean contains(WorldPoint point, WorldArea... areas)
+	{
+		for (WorldArea area : areas)
+		{
+			if (point.getX() >= area.getX() && point.getX() <= area.getX() + area.getWidth() &&
+				point.getY() >= area.getY() && point.getY() <= area.getY() + area.getHeight())
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public Pathfinder(CollisionMap collisionMap, Map<WorldPoint, List<Transport>> transports, List<WorldPoint> start, WorldPoint target, boolean avoidWilderness)
+	{
+		this(collisionMap, transports, start, target.toWorldArea(), avoidWilderness);
+	}
+
+	public Pathfinder(CollisionMap collisionMap, Map<WorldPoint, List<Transport>> transports, List<WorldPoint> start, WorldArea target, boolean avoidWilderness)
+	{
+		this.map = collisionMap;
+		this.transports = transports;
+		this.target = target;
+		this.targetTiles = target.toWorldPointList();
+		this.start = new ArrayList<>();
+		this.nearest = null;
+		this.avoidWilderness = avoidWilderness;
+		this.useCharterShips = Static.getWalkerConfig().useCharterShips();
+		if (useCharterShips)
+		{
+			this.goldAvailable = RS2Inventory.getCount(true, ItemID.COINS_995);
+			RS2Item ring = RS2Equipment.fromSlot(EquipmentInventorySlot.RING);
+			this.ringOfCharosEquipped = ring != null && ring.getId() == ItemID.RING_OF_CHAROSA;
+		}
+		this.start.addAll(start.stream().map(point -> new Node(point, null, goldAvailable)).collect(Collectors.toList()));
+		this.targetsInWilderness = targetTiles.stream().anyMatch(Pathfinder::isInWilderness);
+		if (targetTiles.stream().allMatch(collisionMap::fullBlock))
+		{
+			WorldPoint nearestWalkableTile = Walker.nearestWalkableTile(targetTiles.get(0));
+			if (nearestWalkableTile != null)
+			{
+				log.warn("Target {} is fully blocked, walking to nearest walkable tile {}",
+					targetTiles.size() == 1 ? "tile" : "area", nearestWalkableTile);
+				this.target = nearestWalkableTile.toWorldArea();
+				this.targetTiles = this.target.toWorldPointList();
+			}
+			else
+			{
+				log.warn("Walking to a fully blocked area, pathfinder will be slow");
+			}
+		}
+	}
+
+	private void addNeighbors(Node node)
+	{
+		int x = node.position.getX();
+		int y = node.position.getY();
+		int plane = node.position.getPlane();
+
+		if (map.w(x, y, plane))
+		{
+			addNeighbor(node, new WorldPoint(x - 1, y, plane));
+		}
+
+		if (map.e(x, y, plane))
+		{
+			addNeighbor(node, new WorldPoint(x + 1, y, plane));
+		}
+
+		if (map.s(x, y, plane))
+		{
+			addNeighbor(node, new WorldPoint(x, y - 1, plane));
+		}
+
+		if (map.n(x, y, plane))
+		{
+			addNeighbor(node, new WorldPoint(x, y + 1, plane));
+		}
+
+		if (map.sw(x, y, plane))
+		{
+			addNeighbor(node, new WorldPoint(x - 1, y - 1, plane));
+		}
+
+		if (map.se(x, y, plane))
+		{
+			addNeighbor(node, new WorldPoint(x + 1, y - 1, plane));
+		}
+
+		if (map.nw(x, y, plane))
+		{
+			addNeighbor(node, new WorldPoint(x - 1, y + 1, plane));
+		}
+
+		if (map.ne(x, y, plane))
+		{
+			addNeighbor(node, new WorldPoint(x + 1, y + 1, plane));
+		}
+		WorldPoint trueSource = node.position;
+		boolean inInstancedRegion = Static.getClient().isInInstancedRegion();
+		if (inInstancedRegion)
+		{
+			trueSource = getTrueWorldPoint(trueSource);
+		}
+		for (Transport transport : transports.getOrDefault(trueSource, new ArrayList<>()))
+		{
+			WorldPoint destination =
+				WorldPoint.toLocalInstance(Static.getClient(), transport.getDestination()).stream().findFirst().orElse(transport.getDestination());
+			addNeighbor(node, destination);
+		}
+	}
+
+	private WorldPoint getTrueWorldPoint(WorldPoint point)
+	{
+		try
+		{
+			final LocalPoint localPoint = LocalPoint.fromWorld(Static.getClient(), point);
+			if (localPoint == null)
+			{
+				return point;
+			}
+			return WorldPoint.fromLocalInstance(
+				Static.getClient(),
+				localPoint
+			);
+		}
+		catch (Exception e)
+		{
+			log.warn("Failed to get true world point for {}", point, e);
+		}
+		return point;
+	}
+
+	private void addNeighbor(Node node, WorldPoint neighbor)
+	{
+		if (avoidWilderness && isInWilderness(neighbor) && !isInWilderness(node.position) && !targetsInWilderness)
+		{
+			return;
+		}
+		final int cost = CharterShipLocation.getCharterShipCost(node.position, neighbor, ringOfCharosEquipped);
+		if (useCharterShips && cost > node.goldAvailable)
+		{
+			return;
+		}
+		if (!visited.add(neighbor))
+		{
+			return;
+		}
+
+		boundary.add(new Node(neighbor, node, node.goldAvailable - cost));
+	}
+
+	public List<WorldPoint> find()
+	{
+		final long startTime = System.currentTimeMillis();
+		final List<WorldPoint> path = find(5_000_000);
+		final String targetStr = targetTiles.size() == 1 ? target.toWorldPoint().toString() :
+			String.format("WorldArea(x=%s, y=%s, width=%s, height=%s, plane=%s)",
+				target.getX(), target.getY(), target.getWidth(), target.getHeight(), target.getPlane());
+		log.debug("Path calculation took {} ms to {}", System.currentTimeMillis() - startTime, targetStr);
+		System.gc();
+		return path;
+	}
+
+	public List<WorldPoint> find(int maxSearch)
+	{
+		boundary.addAll(start);
+
+		int bestDistance = Integer.MAX_VALUE;
+
+		while (!boundary.isEmpty())
+		{
+			if (Thread.interrupted())
+			{
+				return List.of();
+			}
+
+			if (visited.size() >= maxSearch)
+			{
+				log.debug("Reached max search limit of {}", maxSearch);
+				return nearest.path();
+			}
+
+			final Node node = boundary.remove(0);
+
+			if (target.contains(node.position))
+			{
+				return node.path();
+			}
+
+			final int distance = target.distanceTo(node.position);
+			if (nearest == null || distance < bestDistance)
+			{
+				nearest = node;
+				bestDistance = distance;
+			}
+
+			addNeighbors(node);
+		}
+
+		if (nearest != null)
+		{
+			return nearest.path();
+		}
+		return List.of();
+	}
+
+	@Override
+	public List<WorldPoint> call() throws Exception
+	{
+		return find();
+	}
+
+	@Value
+	private static class Node
+	{
+		WorldPoint position;
+		Node previous;
+		int goldAvailable;
+
+		public List<WorldPoint> path()
+		{
+			final List<WorldPoint> path = new LinkedList<>();
+			Node node = this;
+
+			while (node != null)
+			{
+				path.add(0, node.position);
+				node = node.previous;
+			}
+
+			return new ArrayList<>(path);
+		}
+	}
+}
