@@ -53,6 +53,7 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
+import joptsimple.OptionSet;
 import okhttp3.OkHttpClient;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -107,7 +108,7 @@ public class PluginManagerTest
 		when(configLoader.get()).thenReturn(mock(RuntimeConfig.class));
 
 		Injector injector = Guice.createInjector(Modules
-			.override(new RuneLiteModule(okHttpClient, () -> null, configLoader, true, false, false,
+			.override(new RuneLiteModule(okHttpClient, () -> null, configLoader, mock(OptionSet.class), true, false, false,
 				RuneLite.DEFAULT_SESSION_FILE,
 				null, false, false
 			))

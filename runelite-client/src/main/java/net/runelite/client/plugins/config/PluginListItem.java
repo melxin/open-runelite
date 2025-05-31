@@ -37,16 +37,23 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JToggleButton;
 import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
 import javax.swing.border.EmptyBorder;
 import lombok.Getter;
+import net.runelite.client.RuneLiteProperties;
+import net.runelite.client.plugins.openrl.OpenRuneLite;
+import net.runelite.client.plugins.openrl.external.OPRLExternalPluginManager;
+import net.runelite.client.ui.ClientUI;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.util.ImageUtil;
@@ -54,6 +61,7 @@ import net.runelite.client.util.SwingUtil;
 
 class PluginListItem extends JPanel implements SearchablePlugin
 {
+	private static final ImageIcon REFRESH_ICON;
 	private static final ImageIcon ON_STAR;
 	private static final ImageIcon OFF_STAR;
 
@@ -68,10 +76,14 @@ class PluginListItem extends JPanel implements SearchablePlugin
 	private final JToggleButton pinButton;
 	private final PluginToggleButton onOffToggle;
 
+	private final JLabel nameLabel;
+
 	static
 	{
+		BufferedImage refreshIcon = ImageUtil.loadImageResource(ConfigPanel.class, "refresh.png");
 		BufferedImage onStar = ImageUtil.loadImageResource(ConfigPanel.class, "star_on.png");
-		ON_STAR = new ImageIcon(onStar);
+		REFRESH_ICON = new ImageIcon(ImageUtil.recolorImage(refreshIcon, ColorScheme.BLUE));
+		ON_STAR = new ImageIcon(ImageUtil.recolorImage(onStar, ColorScheme.GREEN));
 
 		BufferedImage offStar = ImageUtil.luminanceScale(
 			ImageUtil.grayscaleImage(onStar),
@@ -80,7 +92,7 @@ class PluginListItem extends JPanel implements SearchablePlugin
 		OFF_STAR = new ImageIcon(offStar);
 	}
 
-	PluginListItem(PluginListPanel pluginListPanel, PluginConfigurationDescriptor pluginConfig)
+	PluginListItem(PluginListPanel pluginListPanel, PluginConfigurationDescriptor pluginConfig, OPRLExternalPluginManager oprlExternalPluginManager)
 	{
 		this.pluginListPanel = pluginListPanel;
 		this.pluginConfig = pluginConfig;
@@ -102,7 +114,7 @@ class PluginListItem extends JPanel implements SearchablePlugin
 		setLayout(new BorderLayout(3, 0));
 		setPreferredSize(new Dimension(PluginPanel.PANEL_WIDTH, 20));
 
-		JLabel nameLabel = new JLabel(pluginConfig.getName());
+		nameLabel = new JLabel(pluginConfig.getName());
 		nameLabel.setForeground(Color.WHITE);
 
 		if (!pluginConfig.getDescription().isEmpty())
@@ -119,6 +131,14 @@ class PluginListItem extends JPanel implements SearchablePlugin
 
 		pinButton.addActionListener(e ->
 		{
+			if (isPinned())
+			{
+				nameLabel.setForeground(ColorScheme.GREEN_TRANSPARENT);
+			}
+			else
+			{
+				nameLabel.setForeground(Color.WHITE);
+			}
 			pluginListPanel.savePinnedPlugins();
 			pluginListPanel.refresh();
 		});
@@ -126,6 +146,77 @@ class PluginListItem extends JPanel implements SearchablePlugin
 		final JPanel buttonPanel = new JPanel();
 		buttonPanel.setLayout(new GridLayout(1, 2));
 		add(buttonPanel, BorderLayout.LINE_END);
+
+		final Map<String, Map<String, String>> pluginsInfoMap = oprlExternalPluginManager.getPluginsInfoMap();
+		if (pluginConfig.getPlugin() != null && pluginsInfoMap.containsKey(pluginConfig.getPlugin().getClass().getSimpleName()))
+		{
+			keywords.add("oprlexternal");
+			if (OPRLExternalPluginManager.isDevelopmentMode() || RuneLiteProperties.getLauncherVersion() == null)
+			{
+				JButton hotSwapButton = new JButton(REFRESH_ICON);
+				SwingUtil.removeButtonDecorations(hotSwapButton);
+				hotSwapButton.setPreferredSize(new Dimension(25, 0));
+				hotSwapButton.setVisible(false);
+				buttonPanel.add(hotSwapButton);
+
+				hotSwapButton.addActionListener(e ->
+				{
+					Map<String, String> pluginInfo = pluginsInfoMap.get(pluginConfig.getPlugin().getClass().getSimpleName());
+					String pluginId = pluginInfo.get("id");
+
+					final int option = JOptionPane.showOptionDialog(hotSwapButton, "Are you sure you want to hotswap " + pluginId + "? \nThis will remove the plugin from " + OpenRuneLite.EXTERNAL_PLUGINS_DIR.getAbsolutePath(),
+						"Are you sure?", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE,
+						null, new String[]{"Yes", "No"}, "No");
+
+					if (option == JOptionPane.NO_OPTION)
+					{
+						return;
+					}
+
+					hotSwapButton.setIcon(REFRESH_ICON);
+
+					new SwingWorker<>()
+					{
+						@Override
+						protected Boolean doInBackground()
+						{
+							return oprlExternalPluginManager.uninstall(pluginId);
+						}
+
+						@Override
+						protected void done()
+						{
+							// In development mode our plugins will be loaded directly from sources, so we don't need to prompt
+							if (!OPRLExternalPluginManager.isDevelopmentMode())
+							{
+								JOptionPane.showMessageDialog(ClientUI.getFrame(),
+									pluginId + " is unloaded, put the new jar file in the externalmanager folder and click `ok`",
+									"Hotswap " + pluginId,
+									JOptionPane.INFORMATION_MESSAGE);
+							}
+
+							new SwingWorker<>()
+							{
+								@Override
+								protected Boolean doInBackground()
+								{
+									return oprlExternalPluginManager.reloadStart(pluginId);
+								}
+
+								@Override
+								protected void done()
+								{
+									pluginListPanel.rebuildPluginList();
+								}
+							}.execute();
+						}
+					}.execute();
+				});
+
+				hotSwapButton.setVisible(true);
+				hotSwapButton.setToolTipText("Hotswap plugin");
+			}
+		}
 
 		JMenuItem configMenuItem = null;
 		if (pluginConfig.getConfigDescriptor() != null)
@@ -197,6 +288,14 @@ class PluginListItem extends JPanel implements SearchablePlugin
 	void setPinned(boolean pinned)
 	{
 		pinButton.setSelected(pinned);
+		if (pinned)
+		{
+			nameLabel.setForeground(ColorScheme.GREEN_TRANSPARENT);
+		}
+		else
+		{
+			nameLabel.setForeground(Color.WHITE);
+		}
 	}
 
 	void setPluginEnabled(boolean enabled)

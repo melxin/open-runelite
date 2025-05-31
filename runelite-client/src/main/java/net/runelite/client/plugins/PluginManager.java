@@ -46,12 +46,15 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -154,8 +157,21 @@ public class PluginManager
 	{
 		try
 		{
-			final Injector injector = plugin.getInjector();
-
+			Injector injector = plugin.getInjector();
+			if (injector == null)
+			{
+				// Create injector for the module
+				Module pluginModule = (Binder binder) ->
+				{
+					// Since the plugin itself is a module, it won't bind itself, so we'll bind it here
+					binder.bind((Class<Plugin>) plugin.getClass()).toInstance(plugin);
+					binder.install(plugin);
+				};
+				Injector pluginInjector = RuneLite.getInjector().createChildInjector(pluginModule);
+				pluginInjector.injectMembers(plugin);
+				plugin.injector = pluginInjector;
+				injector = pluginInjector;
+			}
 			for (Key<?> key : injector.getBindings().keySet())
 			{
 				Class<?> type = key.getTypeLiteral().getRawType();
@@ -184,7 +200,26 @@ public class PluginManager
 			injectors.add(RuneLite.getInjector());
 			plugins = getPlugins();
 		}
-		plugins.forEach(pl -> injectors.add(pl.getInjector()));
+		plugins.forEach(pl ->
+		{
+			//TODO: Not sure why this is necessary but it is. The Injector isn't null when its handed off from our ExternalPluginManager.
+			//		Hopefully we can figure out the root cause of the underlying issue.
+			if (pl.injector == null)
+			{
+				// Create injector for the module
+				Module pluginModule = (Binder binder) ->
+				{
+					// Since the plugin itself is a module, it won't bind itself, so we'll bind it here
+					binder.bind((Class<Plugin>) pl.getClass()).toInstance(pl);
+					binder.install(pl);
+				};
+				Injector pluginInjector = RuneLite.getInjector().createChildInjector(pluginModule);
+				pluginInjector.injectMembers(pl);
+				pl.injector = pluginInjector;
+			}
+
+			injectors.add(pl.getInjector());
+		});
 
 		List<Config> list = new ArrayList<>();
 		for (Injector injector : injectors)
@@ -319,16 +354,21 @@ public class PluginManager
 		{
 			PluginDescriptor pluginDescriptor = clazz.getAnnotation(PluginDescriptor.class);
 
+			if (Modifier.isAbstract(clazz.getModifiers()))
+			{
+				continue;
+			}
+
 			if (pluginDescriptor == null)
 			{
-				if (clazz.getSuperclass() == Plugin.class)
+				if (Plugin.class.isAssignableFrom(clazz))
 				{
 					log.error("Class {} is a plugin, but has no plugin descriptor", clazz);
 				}
 				continue;
 			}
 
-			if (clazz.getSuperclass() != Plugin.class)
+			if (!Plugin.class.isAssignableFrom(clazz))
 			{
 				log.error("Class {} has plugin descriptor, but is not a plugin", clazz);
 				continue;
@@ -718,6 +758,59 @@ public class PluginManager
 			throw new RuntimeException("Graph has at least one cycle");
 		}
 		return l;
+	}
+
+	/**
+	 * Topologically sort a graph into separate groups.
+	 * Each group represents the dependency level of the plugins.
+	 * Plugins in group (index) 0 has no dependents.
+	 * Plugins in group 1 has dependents in group 0.
+	 * Plugins in group 2 has dependents in group 1, etc.
+	 * This allows for loading dependent groups serially, starting from the last group,
+	 * while loading plugins within each group in parallel.
+	 *
+	 * @param graph
+	 * @param <T>
+	 * @return
+	 */
+	public static <T> List<List<T>> topologicalGroupSort(Graph<T> graph)
+	{
+		final Set<T> root = graph.nodes().stream()
+			.filter(node -> graph.inDegree(node) == 0)
+			.collect(Collectors.toSet());
+		final Map<T, Integer> dependencyCount = new HashMap<>();
+
+		root.forEach(n -> dependencyCount.put(n, 0));
+		root.forEach(n -> graph.successors(n)
+			.forEach(m -> incrementChildren(graph, dependencyCount, m, dependencyCount.get(n) + 1)));
+
+		// create list<list> dependency grouping
+		final List<List<T>> dependencyGroups = new ArrayList<>();
+		final int[] curGroup = {-1};
+
+		dependencyCount.entrySet().stream()
+			.sorted(Map.Entry.comparingByValue())
+			.forEach(entry ->
+			{
+				if (entry.getValue() != curGroup[0])
+				{
+					curGroup[0] = entry.getValue();
+					dependencyGroups.add(new ArrayList<>());
+				}
+				dependencyGroups.get(dependencyGroups.size() - 1).add(entry.getKey());
+			});
+
+		return dependencyGroups;
+	}
+
+	private static <T> void incrementChildren(Graph<T> graph, Map<T, Integer> dependencyCount, T n, int val)
+	{
+		if (!dependencyCount.containsKey(n) || dependencyCount.get(n) < val)
+		{
+			dependencyCount.put(n, val);
+			graph.successors(n).forEach(m ->
+				incrementChildren(graph, dependencyCount, m, val + 1));
+		}
 	}
 
 	public List<Plugin> conflictsForPlugin(Plugin plugin)
