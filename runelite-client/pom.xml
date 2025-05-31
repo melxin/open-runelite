@@ -296,6 +296,26 @@
 			<version>3.14.9</version>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- Open RuneLite -->
+		<!-- ASM -->
+        <dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm</artifactId>
+			<version>9.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm-util</artifactId>
+			<version>9.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm-commons</artifactId>
+			<version>9.0</version>
+		</dependency>
+		<!-- Open RuneLite end -->
+
 	</dependencies>
 
 	<dependencyManagement>
