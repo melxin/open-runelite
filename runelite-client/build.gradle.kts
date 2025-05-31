@@ -100,6 +100,19 @@ dependencies {
     testImplementation(libs.guice.testlib)
     testImplementation(libs.guice.grapher)
     testImplementation(libs.okhttp.mockserver)
+
+    /**
+     * Open RuneLite
+     */
+    // ASM
+    implementation("org.ow2.asm:asm:9.0")
+    implementation("org.ow2.asm:asm-util:9.0")
+    implementation("org.ow2.asm:asm-commons:9.0")
+    // Miglayout
+    implementation("com.miglayout:miglayout-swing:11.4.2")
+    /**
+     * Open RuneLite end
+     */
 }
 
 val shadowJar = tasks.register<Jar>("shadowJar") {
@@ -188,6 +201,7 @@ pmd {
 tasks.pmdMain {
     exclude("**/RuntimeTypeAdapterFactory.java")
     exclude("**/net/runelite/client/party/Party.java")
+    exclude("**/net/runelite/client/plugins/openrl**")
 }
 tasks.pmdTest { enabled = false }
 

@@ -8,6 +8,15 @@
          <trust group="net.runelite.arn"/>
          <trust file=".*-javadoc[.]jar" regex="true"/>
          <trust file=".*-sources[.]jar" regex="true"/>
+         <!-- Open RuneLite -->
+         <trust name="asm" regex="false"/>
+         <trust name="asm-util" regex="false"/>
+         <trust name="asm-analysis" regex="false"/>
+         <trust name="asm-commons" regex="false"/>
+         <trust name="asm-tree" regex="false"/>
+         <trust name="miglayout-core" regex="false"/>
+         <trust name="miglayout-swing" regex="false"/>
+         <!-- Open RuneLite end -->
       </trusted-artifacts>
    </configuration>
    <components>
