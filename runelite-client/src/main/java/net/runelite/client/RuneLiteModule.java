@@ -56,6 +56,8 @@ import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.menus.MenuManager;
 import net.runelite.client.plugins.PluginManager;
+import net.runelite.client.plugins.openrl.OpenRuneLiteConfig;
+import net.runelite.client.plugins.openrl.Static;
 import net.runelite.client.task.Scheduler;
 import net.runelite.client.util.DeferredEventBus;
 import net.runelite.client.util.ExecutorServiceExceptionLogger;
@@ -71,7 +73,7 @@ public class RuneLiteModule extends AbstractModule
 	private final RuntimeConfigLoader configLoader;
 	private final boolean developerMode;
 	private final boolean safeMode;
-	private final boolean disableTelemetry;
+	private final boolean enableTelemetry;
 	private final File sessionfile;
 	private final String profile;
 	private final boolean insecureWriteCredentials;
@@ -119,7 +121,7 @@ public class RuneLiteModule extends AbstractModule
 
 		bindConstant().annotatedWith(Names.named("developerMode")).to(developerMode);
 		bindConstant().annotatedWith(Names.named("safeMode")).to(safeMode);
-		bindConstant().annotatedWith(Names.named("disableTelemetry")).to(disableTelemetry);
+		bindConstant().annotatedWith(Names.named("enableTelemetry")).to(enableTelemetry);
 		bind(File.class).annotatedWith(Names.named("sessionfile")).toInstance(sessionfile);
 		bind(String.class).annotatedWith(Names.named("profile")).toProvider(Providers.of(profile));
 		bindConstant().annotatedWith(Names.named("insecureWriteCredentials")).to(insecureWriteCredentials);
@@ -145,6 +147,14 @@ public class RuneLiteModule extends AbstractModule
 		bind(EventBus.class)
 			.annotatedWith(Names.named("Deferred EventBus"))
 			.to(DeferredEventBus.class);
+
+		/**
+		 * Open RuneLite
+		 */
+
+		requestStaticInjection(
+			Static.class
+		);
 	}
 
 	@Provides
@@ -252,6 +262,13 @@ public class RuneLiteModule extends AbstractModule
 		Gson gson,
 		@Named("runelite.api.base") HttpUrl apiBase)
 	{
-		return disableTelemetry ? null : new TelemetryClient(okHttpClient, gson, apiBase);
+		return enableTelemetry ? new TelemetryClient(okHttpClient, gson, apiBase) : null;
+	}
+
+	@Provides
+	@Singleton
+	OpenRuneLiteConfig provideOpenRuneLiteConfig(ConfigManager configManager)
+	{
+		return configManager.getConfig(OpenRuneLiteConfig.class);
 	}
 }

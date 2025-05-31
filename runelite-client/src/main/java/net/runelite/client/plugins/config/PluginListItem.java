@@ -68,6 +68,8 @@ class PluginListItem extends JPanel implements SearchablePlugin
 	private final JToggleButton pinButton;
 	private final PluginToggleButton onOffToggle;
 
+	private final JLabel nameLabel;
+
 	static
 	{
 		BufferedImage onStar = ImageUtil.loadImageResource(ConfigPanel.class, "star_on.png");
@@ -102,7 +104,7 @@ class PluginListItem extends JPanel implements SearchablePlugin
 		setLayout(new BorderLayout(3, 0));
 		setPreferredSize(new Dimension(PluginPanel.PANEL_WIDTH, 20));
 
-		JLabel nameLabel = new JLabel(pluginConfig.getName());
+		nameLabel = new JLabel(pluginConfig.getName());
 		nameLabel.setForeground(Color.WHITE);
 
 		if (!pluginConfig.getDescription().isEmpty())
@@ -119,6 +121,14 @@ class PluginListItem extends JPanel implements SearchablePlugin
 
 		pinButton.addActionListener(e ->
 		{
+			if (isPinned())
+			{
+				nameLabel.setForeground(ColorScheme.GREEN_TRANSPARENT);
+			}
+			else
+			{
+				nameLabel.setForeground(Color.WHITE);
+			}
 			pluginListPanel.savePinnedPlugins();
 			pluginListPanel.refresh();
 		});
@@ -197,6 +207,14 @@ class PluginListItem extends JPanel implements SearchablePlugin
 	void setPinned(boolean pinned)
 	{
 		pinButton.setSelected(pinned);
+		if (pinned)
+		{
+			nameLabel.setForeground(ColorScheme.GREEN_TRANSPARENT);
+		}
+		else
+		{
+			nameLabel.setForeground(Color.WHITE);
+		}
 	}
 
 	void setPluginEnabled(boolean enabled)
