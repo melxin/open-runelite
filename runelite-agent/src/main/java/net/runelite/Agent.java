@@ -29,6 +29,7 @@ import java.lang.instrument.Instrumentation;
 import net.runelite.transformers.ActorGetAnimationTransformer;
 import net.runelite.transformers.MenuActionPrintTransformer;
 import net.runelite.transformers.MenuActionTransformer;
+import net.runelite.transformers.DeviceIDTransformer;
 
 @Slf4j
 public class Agent
@@ -80,6 +81,7 @@ public class Agent
 			inst.addTransformer(new ActorGetAnimationTransformer());
 			inst.addTransformer(new MenuActionTransformer());
 			inst.addTransformer(new MenuActionPrintTransformer());
+			inst.addTransformer(new DeviceIDTransformer());
 		}
 		catch (Throwable e)
 		{
