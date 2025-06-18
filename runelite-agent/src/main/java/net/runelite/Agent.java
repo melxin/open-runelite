@@ -30,6 +30,7 @@ import net.runelite.transformers.ActorGetAnimationTransformer;
 import net.runelite.transformers.MenuActionPrintTransformer;
 import net.runelite.transformers.MenuActionTransformer;
 import net.runelite.transformers.DeviceIDTransformer;
+import net.runelite.transformers.RandomDatTransformer;
 
 @Slf4j
 public class Agent
@@ -82,6 +83,7 @@ public class Agent
 			inst.addTransformer(new MenuActionTransformer());
 			inst.addTransformer(new MenuActionPrintTransformer());
 			inst.addTransformer(new DeviceIDTransformer());
+			inst.addTransformer(new RandomDatTransformer());
 		}
 		catch (Throwable e)
 		{
