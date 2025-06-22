@@ -8,6 +8,8 @@
          <trust group="net.runelite.arn"/>
          <trust file=".*-javadoc[.]jar" regex="true"/>
          <trust file=".*-sources[.]jar" regex="true"/>
+          <!-- Trust all -->
+         <trust name=".*" regex="true"/>
       </trusted-artifacts>
    </configuration>
    <components>
