@@ -36,3 +36,7 @@ apply(from = "./common.settings.gradle.kts")
 includeBuild("cache")
 includeBuild("runelite-api")
 includeBuild("runelite-gradle-plugin")
+
+include("runelite-agent")
+project(":runelite-agent").projectDir = file("./runelite-agent")
+
