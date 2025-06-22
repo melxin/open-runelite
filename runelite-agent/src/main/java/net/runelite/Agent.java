@@ -27,6 +27,7 @@ package net.runelite;
 import lombok.extern.slf4j.Slf4j;
 import java.lang.instrument.Instrumentation;
 import net.runelite.transformers.ActorGetAnimationTransformer;
+import net.runelite.transformers.MenuActionPrintTransformer;
 import net.runelite.transformers.MenuActionTransformer;
 
 @Slf4j
@@ -78,6 +79,7 @@ public class Agent
 		{
 			inst.addTransformer(new ActorGetAnimationTransformer());
 			inst.addTransformer(new MenuActionTransformer());
+			inst.addTransformer(new MenuActionPrintTransformer());
 		}
 		catch (Throwable e)
 		{
