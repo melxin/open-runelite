@@ -6,6 +6,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.MenuAction;
@@ -155,12 +157,13 @@ public class Inventory
 		final ItemContainer itemContainer = Static.getClientThread().runOnClientThreadOptional(() -> Static.getClient().getItemContainer(InventoryID.INV)).orElse(null);
 		if (itemContainer == null)
 		{
-			return Collections.EMPTY_LIST;
+			return Collections.emptyList();
 		}
 
 		final Item[] items = itemContainer.getItems();
-
-		return Arrays.asList(items);
+		return Stream.of(items)
+			.filter(filter)
+			.collect(Collectors.toList());
 	}
 
 	public static void interact(Item item, String action)

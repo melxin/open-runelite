@@ -12,7 +12,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import net.runelite.api.Client;
-import net.runelite.client.plugins.openrl.Static;
 import net.runelite.client.plugins.openrl.api.commons.Time;
 import net.runelite.client.plugins.openrl.api.input.Mouse;
 import net.runelite.client.plugins.openrl.api.input.naturalmouse.api.MouseInfoAccessor;
@@ -175,7 +174,7 @@ public class NaturalMouse
 		@Override
 		public void setMousePosition(int x, int y)
 		{
-			Mouse.moved(x, y, Static.getClient().getCanvas(), currentTimeMillis());
+			Mouse.moved(x, y, client.getCanvas(), currentTimeMillis());
 		}
 	}
 }

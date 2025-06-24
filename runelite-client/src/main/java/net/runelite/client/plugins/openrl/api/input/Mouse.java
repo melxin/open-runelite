@@ -21,19 +21,31 @@ public class Mouse
 	private static boolean exited = true;
 	private static final Executor CLICK_EXECUTOR = Executors.newSingleThreadExecutor();
 
-	public static void click(int x, int y, boolean left)
+	public static void click(int x, int y, boolean rightClick)
 	{
 		if (Static.getClient().isClientThread())
 		{
-			CLICK_EXECUTOR.execute(() -> handleClick(x, y, left));
+			CLICK_EXECUTOR.execute(() -> handleClick(x, y, rightClick));
 		}
 		else
 		{
-			handleClick(x, y, left);
+			handleClick(x, y, rightClick);
 		}
 	}
 
-	private static void handleClick(int x, int y, boolean left)
+	private static void handleClick(int x, int y, boolean rightClick)
+	{
+		final Canvas canvas = Static.getClient().getCanvas();
+		entered(x, y, canvas, System.currentTimeMillis());
+		exited(x, y, canvas, System.currentTimeMillis());
+		moved(x, y, canvas, System.currentTimeMillis());
+		pressed(x, y, canvas, System.currentTimeMillis(), rightClick ? MouseEvent.BUTTON3 : MouseEvent.BUTTON1);
+		Time.sleep(2, 30);
+		released(x, y, canvas, System.currentTimeMillis(), rightClick ? MouseEvent.BUTTON3 : MouseEvent.BUTTON1);
+		clicked(x, y, canvas, System.currentTimeMillis(), rightClick ? MouseEvent.BUTTON3 : MouseEvent.BUTTON1);
+	}
+
+	/*private static void handleClick(int x, int y, boolean left)
 	{
 		long start = System.currentTimeMillis();
 		Canvas canvas = Static.getClient().getCanvas();
@@ -65,16 +77,16 @@ public class Mouse
 		{
 			Time.sleep(MENU_REPLACE_DELAY);
 		}
+	}*/
+
+	public static void click(Point point, boolean rightClick)
+	{
+		click((int) point.getX(), (int) point.getY(), rightClick);
 	}
 
-	public static void click(Point point, boolean left)
+	public static void clickRandom(boolean rightClick)
 	{
-		click((int) point.getX(), (int) point.getY(), left);
-	}
-
-	public static void clickRandom(boolean left)
-	{
-		click(CLICK_POINT_SUPPLIER.get(), left);
+		click(CLICK_POINT_SUPPLIER.get(), rightClick);
 	}
 
 	public static synchronized void pressed(int x, int y, Canvas canvas, long time, int button)

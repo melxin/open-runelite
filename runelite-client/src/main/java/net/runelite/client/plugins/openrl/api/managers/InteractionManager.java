@@ -3,7 +3,9 @@ package net.runelite.client.plugins.openrl.api.managers;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.Nullable;
 import net.runelite.api.Client;
+import net.runelite.api.Menu;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.events.MenuEntryAdded;
@@ -55,7 +57,7 @@ public class InteractionManager
 	{
 		log.info("{}", event);
 		this.menuAutomated = event;
-		this.targetMenu = event.getMenuEntry();
+		//this.targetMenu = event.getMenuEntry();
 		interact((MenuAutomated) event);
 	}
 
@@ -78,18 +80,37 @@ public class InteractionManager
 				break;
 			case MOUSE_EVENTS:
 				naturalMouse.moveTo(canvasX, canvasY);
-				Point mousePosition = Mouse.getPosition();
-				if (mousePosition.getX() == canvasX && mousePosition.getY() == canvasY)
+
+				if (menuAction == MenuAction.WIDGET_FIRST_OPTION
+					|| menuAction == MenuAction.NPC_FIRST_OPTION
+					|| menuAction == MenuAction.PLAYER_FIRST_OPTION
+					|| menuAction == MenuAction.GAME_OBJECT_FIRST_OPTION
+					|| menuAction == MenuAction.GROUND_ITEM_FIRST_OPTION
+					|| menuAction == MenuAction.ITEM_FIRST_OPTION)
 				{
-					Mouse.click(canvasX, canvasY, true);
+					Mouse.click(canvasX, canvasY, false);
+					return;
+				}
+
+				Mouse.click(canvasX, canvasY, true);
+				Time.sleepUntil(() -> client.isMenuOpen(), 1000);
+				if (client.isMenuOpen())
+				{
+					final Point clickPoint = getMenuEntryClickPoint(param0, param1, menuAction, index, itemId, worldViewId);
+					if (clickPoint == null)
+					{
+						return;
+					}
+					naturalMouse.moveTo(clickPoint.x, clickPoint.y);
+					Mouse.click(clickPoint.x, clickPoint.y, false);
 				}
 				break;
 			case BOTH:
 				naturalMouse.moveTo(canvasX, canvasY);
-				mousePosition = Mouse.getPosition();
+				final Point mousePosition = Mouse.getPosition();
 				if (mousePosition.getX() == canvasX && mousePosition.getY() == canvasY)
 				{
-					Mouse.click(canvasX, canvasY, true);
+					Mouse.click(canvasX, canvasY, false);
 					Time.sleep(50, 100);
 					Static.invokeMenuAction(param0, param1, menuAction, index, itemId, worldViewId, option, target, canvasX, canvasY);
 				}
@@ -126,6 +147,87 @@ public class InteractionManager
 	private void onMenuOptionClicked(MenuOptionClicked event)
 	{
 		this.targetMenu = null;
+	}
+
+	/*public int getMenuEntryIdx(int param0, int param1, MenuAction menuAction, int index, int itemId, int worldViewId)
+	{
+		int idx = -1;
+
+		final Menu menu = client.getMenu();
+		if (!client.isMenuOpen() || menu == null)
+		{
+			return idx;
+		}
+
+		final MenuEntry[] menuEntries = menu.getMenuEntries();
+		for (int i = menuEntries.length - 1; i >= 0; i--)
+		{
+			MenuEntry menuEntry = menuEntries[i];
+			if (menuEntry != null
+				&& param0 == menuEntry.getParam0()
+				&& param1 == menuEntry.getParam1()
+				&& menuAction == menuEntry.getType()
+				&& index == menuEntry.getIdentifier()
+				&& itemId == menuEntry.getItemId()
+				&& worldViewId == menuEntry.getWorldViewId())
+			{
+				idx = i;
+				break;
+			}
+		}
+
+		return idx;
+	}*/
+
+	@Nullable
+	public Point getMenuEntryClickPoint(int param0, int param1, MenuAction menuAction, int index, int itemId, int worldViewId)
+	{
+		final Menu menu = client.getMenu();
+
+		if (!client.isMenuOpen() || menu == null)
+		{
+			return null;
+		}
+
+		int menuEntryIdx = -1;
+		final MenuEntry[] menuEntries = menu.getMenuEntries();
+		for (int i = menuEntries.length - 1; i >= 0; i--)
+		{
+			final MenuEntry menuEntry = menuEntries[i];
+			if (menuEntry == null)
+			{
+				continue;
+			}
+
+			// Inventory items?
+			if (itemId != -1
+				&& itemId == menuEntry.getItemId()
+				&& index == menuEntry.getIdentifier())
+			{
+				menuEntryIdx = i;
+				break;
+			}
+
+			if (param0 == menuEntry.getParam0()
+				&& param1 == menuEntry.getParam1()
+				&& menuAction == menuEntry.getType()
+				&& index == menuEntry.getIdentifier()
+				&& itemId == menuEntry.getItemId()
+				&& worldViewId == menuEntry.getWorldViewId())
+			{
+				menuEntryIdx = i;
+				break;
+			}
+		}
+
+		if (client.isMenuOpen() && menuEntryIdx >= 0 && menuEntryIdx <= menu.getMenuEntries().length - 1)
+		{
+			final int clickX = menu.getMenuX() + (menu.getMenuWidth() / 2);
+			final int clickY = (menu.getMenuEntries().length - 1 - menuEntryIdx - client.getMenuScroll()) * 15 + menu.getMenuY() + 31;
+			return new Point(clickX, clickY);
+		}
+
+		return null;
 	}
 
 	public boolean clickInsideMinimap(Point point)
