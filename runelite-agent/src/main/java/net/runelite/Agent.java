@@ -30,6 +30,7 @@ import net.runelite.transformers.ActorGetAnimationTransformer;
 import net.runelite.transformers.MenuActionPrintTransformer;
 import net.runelite.transformers.MenuActionTransformer;
 import net.runelite.transformers.DeviceIDTransformer;
+import net.runelite.transformers.PlatformInfoTransformer;
 import net.runelite.transformers.RandomDatTransformer;
 import net.runelite.transformers.RuneLiteGetInputArgumentsTransformer;
 import net.runelite.transformers.SendStackTraceTransformer;
@@ -88,6 +89,7 @@ public class Agent
 			inst.addTransformer(new RandomDatTransformer());
 			inst.addTransformer(new SendStackTraceTransformer());
 			inst.addTransformer(new RuneLiteGetInputArgumentsTransformer());
+			inst.addTransformer(new PlatformInfoTransformer());
 		}
 		catch (Throwable e)
 		{
