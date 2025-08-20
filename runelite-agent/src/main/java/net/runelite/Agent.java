@@ -27,6 +27,7 @@ package net.runelite;
 import lombok.extern.slf4j.Slf4j;
 import java.lang.instrument.Instrumentation;
 import net.runelite.transformers.ActorGetAnimationTransformer;
+import net.runelite.transformers.FocusLostTransformer;
 import net.runelite.transformers.MenuActionPrintTransformer;
 import net.runelite.transformers.MenuActionTransformer;
 import net.runelite.transformers.DeviceIDTransformer;
@@ -90,6 +91,7 @@ public class Agent
 			inst.addTransformer(new SendStackTraceTransformer());
 			inst.addTransformer(new RuneLiteGetInputArgumentsTransformer());
 			inst.addTransformer(new PlatformInfoTransformer());
+			inst.addTransformer(new FocusLostTransformer());
 		}
 		catch (Throwable e)
 		{
