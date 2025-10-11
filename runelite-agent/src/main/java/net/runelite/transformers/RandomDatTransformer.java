@@ -36,8 +36,6 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.InsnList;
-import org.objectweb.asm.tree.IntInsnNode;
-import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import java.io.File;
 import java.io.FileInputStream;
@@ -65,12 +63,12 @@ public class RandomDatTransformer implements ClassFileTransformer
 
 	private String targetGetRandomDatClassName;
 	private final List<String> targetGetRandomDatMethodNames = new ArrayList<>();
-	private InsnList targetInstructions;
 
 	private String targetWriteRandomDatClassName;
 	private final List<String> targetWriteRandomDatMethodNames = new ArrayList<>();
 
 	private FieldInsnNode getClient;
+	private FieldInsnNode getRandomDatData;
 
 	@Override
 	public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classFileBuffer)
@@ -85,53 +83,69 @@ public class RandomDatTransformer implements ClassFileTransformer
 
 		transformedClasses.add(className);
 
-		final ClassNode classNode = new ClassNode();
+		final ClassNode classNode = new ClassNode(Opcodes.ASM9);
 		reader.accept(classNode, ClassReader.SKIP_FRAMES);
 
-		if (getClient == null && className.equals("client"))
+		if (className.equals("client"))
 		{
-			final List<MethodNode> methods = classNode.methods;
 			outer:
-			for (MethodNode m : methods)
+			for (MethodNode m : classNode.methods)
 			{
 				final InsnList instructions = m.instructions;
 				for (AbstractInsnNode insn : instructions)
 				{
-					if (insn instanceof FieldInsnNode && insn.getOpcode() == Opcodes.GETSTATIC)
+					if (getClient == null && insn instanceof FieldInsnNode && insn.getOpcode() == Opcodes.GETSTATIC)
 					{
-						final FieldInsnNode getStaticInsn = (FieldInsnNode) insn;
-						if (getStaticInsn.desc.equals("Lclient;"))
+						final FieldInsnNode fin = (FieldInsnNode) insn;
+						if (fin.desc.equals("Lclient;"))
 						{
-							this.getClient = getStaticInsn;
-							break outer;
+							this.getClient = fin;
+						}
+					}
+					else if (getRandomDatData == null && m.name.equals("<clinit>") && insn instanceof FieldInsnNode && insn.getOpcode() == Opcodes.PUTSTATIC)
+					{
+						final FieldInsnNode fin = (FieldInsnNode) insn;
+						if (fin.desc.equals("[B") && insn.getPrevious().getOpcode() == Opcodes.ACONST_NULL)
+						{
+							log.info("Found static randomDatData: {}.{} {}", fin.owner, fin.name, fin.desc);
+							this.getRandomDatData = fin;
 						}
 					}
 				}
+
+				if (getClient != null && getRandomDatData != null)
+				{
+					break outer;
+				}
+			}
+
+			if (getClient == null || getRandomDatData == null)
+			{
+				log.error(getClient == null ? "client is null" : "randomDatData is null");
+				return classFileBuffer;
 			}
 		}
 
-		if (targetGetRandomDatClassName == null)
+		if (getClient == null || getRandomDatData == null)
 		{
-			final List<MethodNode> methods = classNode.methods;
-			for (MethodNode method : methods)
+			return classFileBuffer;
+		}
+
+		for (MethodNode method : classNode.methods)
+		{
+			for (AbstractInsnNode insn : method.instructions)
 			{
-				// Method 1 and method 2 returning random.dat byte[] // Method 3 requires buffer write
-				if (method.desc.equals("(I)[B") || method.desc.equals("(S)[B") || method.desc.startsWith("(L") && method.desc.endsWith(";I)V"))
+				if (insn instanceof FieldInsnNode && insn.getOpcode() == Opcodes.GETSTATIC && insn.getNext().getOpcode() == Opcodes.IFNULL)
 				{
-					final InsnList instructions = method.instructions;
-					for (AbstractInsnNode insn : instructions)
+					final FieldInsnNode fin = (FieldInsnNode) insn;
+					if (fin.owner.equals(getRandomDatData.owner) && fin.name.equals(getRandomDatData.name) && fin.desc.equals(getRandomDatData.desc))
 					{
-						if (insn instanceof IntInsnNode && insn.getOpcode() == Opcodes.BIPUSH && ((IntInsnNode) insn).operand == 24
-							&& insn.getNext() instanceof IntInsnNode && insn.getNext().getOpcode() == Opcodes.NEWARRAY && ((IntInsnNode) insn.getNext()).operand == 8)
+						this.targetGetRandomDatClassName = className;
+						if (!targetGetRandomDatMethodNames.contains(method.name))
 						{
-							this.targetGetRandomDatClassName = className;
-							if (!targetGetRandomDatMethodNames.contains(method.name))
-							{
-								log.info("Found target random dat method getter: {}.{}", classNode.name, method.name);
-								targetGetRandomDatMethodNames.add(method.name);
-								this.targetInstructions = instructions;
-								break;
-							}
+							log.info("Found get random dat method: {}.{}", classNode.name, method.name);
+							targetGetRandomDatMethodNames.add(method.name);
+							break;
 						}
 					}
 				}
@@ -171,84 +185,36 @@ public class RandomDatTransformer implements ClassFileTransformer
 
 				if (targetGetRandomDatClassName != null && targetGetRandomDatClassName.equals(className) && targetGetRandomDatMethodNames.contains(name))
 				{
-					if (descriptor.equals("(I)[B") || descriptor.equals("(S)[B") ||  descriptor.startsWith("(L") && descriptor.endsWith(";I)V"))
+					return new AdviceAdapter(Opcodes.ASM9, mv, access, name, descriptor)
 					{
-						return new MethodVisitor(Opcodes.ASM9, mv)
+						@Override
+						protected void onMethodEnter()
 						{
-							@Override
-							public void visitCode()
-							{
-								mv.visitFieldInsn(getClient.getOpcode(), getClient.owner, getClient.name, getClient.desc);
-								mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "client", "getLauncherDisplayName", "()Ljava/lang/String;", false);
-								mv.visitInsn(Opcodes.DUP); // Duplicate for null check
-								final Label identificationsLabel = new Label();
-								mv.visitJumpInsn(Opcodes.IFNONNULL, identificationsLabel); // Jump
-								mv.visitInsn(Opcodes.POP); // Remove the null value
-								mv.visitFieldInsn(getClient.getOpcode(), getClient.owner, getClient.name, getClient.desc);
-								mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "client", "getUsername", "()Ljava/lang/String;", false);
-								mv.visitLabel(identificationsLabel);
+							mv.visitFieldInsn(getClient.getOpcode(), getClient.owner, getClient.name, getClient.desc);
+							mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "client", "getLauncherDisplayName", "()Ljava/lang/String;", false);
+							mv.visitInsn(Opcodes.DUP); // Duplicate for null check
+							final Label identificationsLabel = new Label();
+							mv.visitJumpInsn(Opcodes.IFNONNULL, identificationsLabel); // Jump
+							mv.visitInsn(Opcodes.POP); // Remove the null value
+							mv.visitFieldInsn(getClient.getOpcode(), getClient.owner, getClient.name, getClient.desc);
+							mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "client", "getUsername", "()Ljava/lang/String;", false);
+							mv.visitLabel(identificationsLabel);
 
-								mv.visitMethodInsn(Opcodes.INVOKESTATIC, CachedRandomDat.class.getName().replace(".", "/"), "getCachedRandomDat", "(Ljava/lang/String;)[B", false);
-								mv.visitVarInsn(Opcodes.ASTORE, 1); // Store cached byte[] data as local var 1
+							mv.visitMethodInsn(Opcodes.INVOKESTATIC, CachedRandomDat.class.getName().replace(".", "/"), "getCachedRandomDat", "(Ljava/lang/String;)[B", false);
+							mv.visitVarInsn(Opcodes.ASTORE, 2); // Store cached byte[] data as local var 2
 
-								mv.visitLdcInsn("[GamePack] Using cached random.dat: ");
-								mv.visitVarInsn(Opcodes.ALOAD, 1); // byte[] data
-								mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/util/Arrays", "toString", "([B)Ljava/lang/String;", false);
-								mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "concat", "(Ljava/lang/String;)Ljava/lang/String;", false);
-								mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
-								mv.visitInsn(Opcodes.SWAP); // Swap print stream below the message
-								mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
-
-								if (descriptor.equals("(I)[B") || descriptor.equals("(S)[B"))
-								{
-									// Reference cached byte[] data & return
-									mv.visitVarInsn(Opcodes.ALOAD, 1);
-									mv.visitInsn(Opcodes.ARETURN);
-								}
-								else if (descriptor.startsWith("(L") && descriptor.endsWith(";I)V"))
-								{
-									// arg0
-									mv.visitVarInsn(Opcodes.ALOAD, 0);
-
-									// Reference cached byte[] data
-									mv.visitVarInsn(Opcodes.ALOAD, 1);
-
-									// 0 length
-									mv.visitInsn(Opcodes.ICONST_0);
-
-									// byte[] data length
-									mv.visitVarInsn(Opcodes.ALOAD, 1);
-									mv.visitInsn(Opcodes.ARRAYLENGTH);
-
-									for (int i = targetInstructions.size() - 1; i >= 0; i--)
-									{
-										final AbstractInsnNode insn = targetInstructions.get(i);
-										if (insn instanceof MethodInsnNode && (insn.getOpcode() == Opcodes.INVOKEVIRTUAL || insn.getOpcode() == Opcodes.INVOKESTATIC))
-										{
-											final MethodInsnNode methodInsn = (MethodInsnNode) insn;
-											if (methodInsn.desc.equals("([BIIB)V") || methodInsn.desc.contains("[BIIB)V"))
-											{
-												log.info("Buffer writeBytes method: {}.{} {}", methodInsn.owner, methodInsn.name, methodInsn.desc);
-												if (insn.getPrevious() instanceof IntInsnNode)
-												{
-													final IntInsnNode intInsn = (IntInsnNode) insn.getPrevious();
-													log.info("Garbage value found: {}", intInsn.operand);
-													// Garbage value
-													mv.visitIntInsn(intInsn.getOpcode(), intInsn.operand);
-												}
-												// Write to buffer & return
-												mv.visitMethodInsn(methodInsn.getOpcode(), methodInsn.owner, methodInsn.name, methodInsn.desc, methodInsn.itf);
-												mv.visitInsn(Opcodes.RETURN);
-												break;
-											}
-										}
-									}
-								}
-
-								mv.visitEnd();
-							}
-						};
-					}
+							mv.visitLdcInsn("[GamePack] Using cached random.dat: ");
+							mv.visitVarInsn(Opcodes.ALOAD, 2); // byte[] data
+							mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/util/Arrays", "toString", "([B)Ljava/lang/String;", false);
+							mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "concat", "(Ljava/lang/String;)Ljava/lang/String;", false);
+							mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
+							mv.visitInsn(Opcodes.SWAP); // Swap print stream below the message
+							mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+							// Reference cached byte[] data & put
+							mv.visitVarInsn(Opcodes.ALOAD, 2);
+							mv.visitFieldInsn(Opcodes.PUTSTATIC, getRandomDatData.owner, getRandomDatData.name, getRandomDatData.desc);
+						}
+					};
 				}
 
 				if (targetWriteRandomDatClassName != null && targetWriteRandomDatClassName.equals(className) && targetWriteRandomDatMethodNames.contains(name))
