@@ -34,6 +34,7 @@ import net.runelite.transformers.DeviceIDTransformer;
 import net.runelite.transformers.PlatformInfoTransformer;
 import net.runelite.transformers.RandomDatTransformer;
 import net.runelite.transformers.RuneLiteGetInputArgumentsTransformer;
+import net.runelite.transformers.RuneLiteMouseClickPacketTransformer;
 import net.runelite.transformers.SendStackTraceTransformer;
 
 @Slf4j
@@ -92,6 +93,7 @@ public class Agent
 			inst.addTransformer(new RuneLiteGetInputArgumentsTransformer());
 			inst.addTransformer(new PlatformInfoTransformer());
 			inst.addTransformer(new FocusLostTransformer());
+			inst.addTransformer(new RuneLiteMouseClickPacketTransformer());
 		}
 		catch (Throwable e)
 		{
