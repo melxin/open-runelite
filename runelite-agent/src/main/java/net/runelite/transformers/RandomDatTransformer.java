@@ -61,11 +61,8 @@ public class RandomDatTransformer implements ClassFileTransformer
 {
 	private static final Set<String> transformedClasses = ConcurrentHashMap.newKeySet();
 
-	private String targetGetRandomDatClassName;
-	private final List<String> targetGetRandomDatMethodNames = new ArrayList<>();
-
-	private String targetWriteRandomDatClassName;
-	private final List<String> targetWriteRandomDatMethodNames = new ArrayList<>();
+	private final List<String> targetGetRandomDatMethods = new ArrayList<>();
+	private final List<String> targetWriteRandomDatMethods = new ArrayList<>();
 
 	private FieldInsnNode getClient;
 	private FieldInsnNode getRandomDatData;
@@ -133,6 +130,22 @@ public class RandomDatTransformer implements ClassFileTransformer
 
 		for (MethodNode method : classNode.methods)
 		{
+			final String prefix = className + "#" + method.name + "#" + method.desc;
+
+			// Identify write random dat methods
+			if (targetWriteRandomDatMethods.isEmpty())
+			{
+				if (method.desc.equals("([BI[BII)V"))
+				{
+					if (!targetWriteRandomDatMethods.contains(prefix))
+					{
+						log.info("Found write random dat method: {}.{} {}", classNode.name, method.name, method.desc);
+						targetWriteRandomDatMethods.add(prefix);
+					}
+				}
+			}
+
+			// Identify get random dat methods
 			for (AbstractInsnNode insn : method.instructions)
 			{
 				if (insn instanceof FieldInsnNode && insn.getOpcode() == Opcodes.GETSTATIC && insn.getNext().getOpcode() == Opcodes.IFNULL)
@@ -140,39 +153,15 @@ public class RandomDatTransformer implements ClassFileTransformer
 					final FieldInsnNode fin = (FieldInsnNode) insn;
 					if (fin.owner.equals(getRandomDatData.owner) && fin.name.equals(getRandomDatData.name) && fin.desc.equals(getRandomDatData.desc))
 					{
-						this.targetGetRandomDatClassName = className;
-						if (!targetGetRandomDatMethodNames.contains(method.name))
+						if (!targetGetRandomDatMethods.contains(prefix))
 						{
-							log.info("Found get random dat method: {}.{}", classNode.name, method.name);
-							targetGetRandomDatMethodNames.add(method.name);
+							log.info("Found get random dat method: {}.{} {}", classNode.name, method.name, method.desc);
+							targetGetRandomDatMethods.add(prefix);
 							break;
 						}
 					}
 				}
 			}
-		}
-
-		if (targetWriteRandomDatClassName == null)
-		{
-			final List<MethodNode> methods = classNode.methods;
-			for (MethodNode method : methods)
-			{
-				if (method.desc.equals("([BI[BII)V"))
-				{
-					this.targetWriteRandomDatClassName = className;
-					if (!targetWriteRandomDatMethodNames.contains(method.name))
-					{
-						log.info("Found write random dat method: {}.{}", classNode.name, method.name);
-						targetWriteRandomDatMethodNames.add(method.name);
-						break;
-					}
-				}
-			}
-		}
-
-		if (getClient == null)
-		{
-			return classFileBuffer;
 		}
 
 		// Transform targets
@@ -183,7 +172,8 @@ public class RandomDatTransformer implements ClassFileTransformer
 			{
 				MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
 
-				if (targetGetRandomDatClassName != null && targetGetRandomDatClassName.equals(className) && targetGetRandomDatMethodNames.contains(name))
+				final String prefix = className + "#" + name + "#" + descriptor;
+				if (targetGetRandomDatMethods.contains(prefix))
 				{
 					return new AdviceAdapter(Opcodes.ASM9, mv, access, name, descriptor)
 					{
@@ -217,7 +207,7 @@ public class RandomDatTransformer implements ClassFileTransformer
 					};
 				}
 
-				if (targetWriteRandomDatClassName != null && targetWriteRandomDatClassName.equals(className) && targetWriteRandomDatMethodNames.contains(name))
+				if (targetWriteRandomDatMethods.contains(prefix))
 				{
 					return new AdviceAdapter(Opcodes.ASM9, mv, access, name, descriptor)
 					{
@@ -251,6 +241,15 @@ public class RandomDatTransformer implements ClassFileTransformer
 						}
 					};
 				}
+
+				/*mv = new MethodVisitor(Opcodes.ASM9, mv)
+				{
+					@Override
+					public void visitFieldInsn(int opcode, String owner, String name, String descriptor)
+					{
+						super.visitFieldInsn(opcode, owner, name, descriptor);
+					}
+				};*/
 
 				return mv;
 			}
