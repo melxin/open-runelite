@@ -52,6 +52,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import net.runelite.NonLoadingClassWriter;
 
 /**
  * Cached random.dat bytes per account so each have their own random.dat
@@ -71,7 +72,7 @@ public class RandomDatTransformer implements ClassFileTransformer
 	public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classFileBuffer)
 	{
 		final ClassReader reader = new ClassReader(classFileBuffer);
-		final ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+		final ClassWriter writer = new NonLoadingClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
 
 		if (transformedClasses.contains(className) || className.length() > 2 && !className.equals("client"))
 		{
