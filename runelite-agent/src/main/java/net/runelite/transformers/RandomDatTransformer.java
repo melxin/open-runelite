@@ -52,7 +52,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import net.runelite.NonLoadingClassWriter;
 
 /**
  * Cached random.dat bytes per account so each have their own random.dat
@@ -72,7 +71,7 @@ public class RandomDatTransformer implements ClassFileTransformer
 	public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classFileBuffer)
 	{
 		final ClassReader reader = new ClassReader(classFileBuffer);
-		final ClassWriter writer = new NonLoadingClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+		final ClassWriter writer = new ClassWriter(reader, ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
 
 		if (transformedClasses.contains(className) || className.length() > 3 && !className.equals("client"))
 		{
@@ -206,6 +205,42 @@ public class RandomDatTransformer implements ClassFileTransformer
 							mv.visitFieldInsn(Opcodes.PUTSTATIC, getRandomDatData.owner, getRandomDatData.name, getRandomDatData.desc);
 						}
 					};
+
+					/*return new MethodVisitor(Opcodes.ASM9, mv)
+					{
+						@Override
+						public void visitFieldInsn(int opcode, String owner, String name, String desc)
+						{
+							if (opcode == Opcodes.GETSTATIC && owner.equals(getRandomDatData.owner) && name.equals(getRandomDatData.name) && desc.equals(getRandomDatData.desc))
+							{
+								mv.visitFieldInsn(getClient.getOpcode(), getClient.owner, getClient.name, getClient.desc);
+								mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "client", "getLauncherDisplayName", "()Ljava/lang/String;", false);
+								mv.visitInsn(Opcodes.DUP); // Duplicate for null check
+								final Label identificationsLabel = new Label();
+								mv.visitJumpInsn(Opcodes.IFNONNULL, identificationsLabel); // Jump
+								mv.visitInsn(Opcodes.POP); // Remove the null value
+								mv.visitFieldInsn(getClient.getOpcode(), getClient.owner, getClient.name, getClient.desc);
+								mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "client", "getUsername", "()Ljava/lang/String;", false);
+								mv.visitLabel(identificationsLabel);
+
+								mv.visitMethodInsn(Opcodes.INVOKESTATIC, CachedRandomDat.class.getName().replace(".", "/"), "getCachedRandomDat", "(Ljava/lang/String;)[B", false);
+								mv.visitVarInsn(Opcodes.ASTORE, 13); // Store cached byte[] data as local var 1
+
+								mv.visitLdcInsn("[GamePack] Using cached random.dat: ");
+								mv.visitVarInsn(Opcodes.ALOAD, 13); // byte[] data
+								mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/util/Arrays", "toString", "([B)Ljava/lang/String;", false);
+								mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "concat", "(Ljava/lang/String;)Ljava/lang/String;", false);
+								mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
+								mv.visitInsn(Opcodes.SWAP); // Swap print stream below the message
+								mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
+								super.visitVarInsn(Opcodes.ALOAD, 13);
+							}
+							else
+							{
+								super.visitFieldInsn(opcode, owner, name, desc);
+							}
+						}
+					};*/
 				}
 
 				if (targetWriteRandomDatMethods.contains(prefix))
