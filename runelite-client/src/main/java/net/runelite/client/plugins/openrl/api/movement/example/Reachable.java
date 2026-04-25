@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.openrl.api.movement;
+package net.runelite.client.plugins.openrl.api.movement.example;
 
 import net.runelite.api.CollisionData;
 import net.runelite.api.CollisionDataFlag;

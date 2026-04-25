@@ -27,6 +27,7 @@ package net.runelite.client.plugins.openrl.plugins.walker;
 import com.google.inject.Provides;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import java.awt.Color;
 import java.awt.Graphics;
@@ -50,7 +51,7 @@ import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.openrl.Static;
 import net.runelite.client.plugins.openrl.api.events.Draw;
-import net.runelite.client.plugins.openrl.api.movement.Walker;
+import net.runelite.client.plugins.openrl.api.movement.unethicalite.Movement;
 import net.runelite.client.plugins.openrl.api.plugin.LoopedPlugin;
 import net.runelite.client.plugins.openrl.api.rs2.providers.entities.RS2Players;
 import net.runelite.client.plugins.openrl.api.rs2.providers.scene.RS2Tiles;
@@ -63,13 +64,21 @@ import net.runelite.client.plugins.openrl.api.rs2.wrappers.RS2WorldPoint;
 	name = "Open RuneLite Walker plugin",
 	description = "Add walk option",
 	tags = {"walker", "movement", "menu option", "test", "collision"},
-	enabledByDefault = false
+	enabledByDefault = true
 )
 @Slf4j
 public class WalkerPlugin extends LoopedPlugin
 {
 	@Inject
 	private Client client;
+
+	@Inject
+	private RegionHandler regionHandler;
+
+	private WorldPoint targetWorldPoint;
+
+	@Setter
+	private static List<WorldPoint> currentPath;
 
 	@Inject
 	protected WalkerConfig config;
@@ -98,12 +107,31 @@ public class WalkerPlugin extends LoopedPlugin
 		}
 
 		this.targetWorldPoint = null;
-		Walker.path = null;
+		currentPath = null;
+	}
+
+	@Override
+	protected void startUp()
+	{
+		this.targetWorldPoint = null;
+		currentPath = null;
+	}
+
+	@Override
+	protected void shutDown()
+	{
+		this.targetWorldPoint = null;
+		currentPath = null;
 	}
 
 	@Subscribe
 	protected void onMenuEntryAdded(MenuEntryAdded event)
 	{
+		if (!config.testWalkerMenuOptions())
+		{
+			return;
+		}
+
 		final int type = event.getType();
 		if (type == MenuAction.WALK.getId())
 		{
@@ -125,8 +153,7 @@ public class WalkerPlugin extends LoopedPlugin
 					}
 					log.info("Selected scene world point: {}", selectedSceneWorldPoint);
 					this.targetWorldPoint = selectedSceneWorldPoint;
-					Walker.walkTo(selectedSceneWorldPoint);
-					//Pathfinder.walkPath(selectedSceneWorldPoint);
+					Movement.walkTo(targetWorldPoint);
 				});
 		}
 		else if (RS2WorldMap.isOpen() && type == MenuAction.CANCEL.getId())
@@ -149,19 +176,17 @@ public class WalkerPlugin extends LoopedPlugin
 					}
 					log.info("Selected world point: {}", selectedWorldPoint);
 					this.targetWorldPoint = selectedWorldPoint;
-					Walker.walkTo(selectedWorldPoint);
+					Movement.walkTo(selectedWorldPoint);
 				});
 		}
 	}
 
-	private WorldPoint targetWorldPoint;
-
 	@Override
 	protected int loop()
 	{
-		if (targetWorldPoint == null || Walker.path == null)
+		if (targetWorldPoint == null /*|| currentPath == null*/)
 		{
-			return 1000;
+			return -1;
 		}
 		final RS2Player local = RS2Players.getLocal();
 		if (local == null)
@@ -169,8 +194,24 @@ public class WalkerPlugin extends LoopedPlugin
 			return -1;
 		}
 
-		Walker.walkTo(targetWorldPoint);
-		return 1000;
+		/*if (Movement.isWalking())
+		{
+			log.info("Walking!");
+		}*/
+
+		if (local.getWorldLocation().equals(targetWorldPoint) /*|| local.distanceTo(targetWorldPoint) <= 1*/)
+		{
+			log.info("Destination reached!");
+			this.targetWorldPoint = null;
+			currentPath = null;
+			return -1;
+		}
+
+		if (targetWorldPoint != null)
+		{
+			Movement.walkTo(targetWorldPoint);
+		}
+		return -1;
 	}
 
 	@Subscribe
@@ -210,13 +251,13 @@ public class WalkerPlugin extends LoopedPlugin
 			}
 		}
 
-		if (targetWorldPoint == null || Walker.path == null)
+		if (!config.pathOverlay() || targetWorldPoint == null || currentPath == null)
 		{
 			return;
 		}
 
-		final List<WorldPoint> remainingPath = Walker.remainingPath(Walker.path);
-		for (WorldPoint wp : remainingPath)
+		//final List<WorldPoint> remainingPath = Walker.remainingPath(Walker.path);
+		for (WorldPoint wp : currentPath)
 		{
 			new RS2WorldPoint(wp).outline(Static.getClient(), g2d, Color.GREEN);
 		}

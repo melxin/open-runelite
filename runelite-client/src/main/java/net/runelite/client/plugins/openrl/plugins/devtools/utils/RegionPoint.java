@@ -1,4 +1,4 @@
-package net.runelite.client.plugins.openrl.plugins.devtools;
+package net.runelite.client.plugins.openrl.plugins.devtools.utils;
 
 import lombok.Value;
 import net.runelite.api.Client;

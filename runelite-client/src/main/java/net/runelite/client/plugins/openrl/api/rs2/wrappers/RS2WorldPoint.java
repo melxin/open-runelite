@@ -29,8 +29,11 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
 import java.awt.Stroke;
+import java.util.ArrayList;
+import java.util.List;
 import net.runelite.api.Client;
 import net.runelite.api.Perspective;
+import net.runelite.api.Tile;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldArea;
 import net.runelite.api.coords.WorldPoint;
@@ -187,6 +190,94 @@ public class RS2WorldPoint
 	public static int unpackZ(int packedZ)
 	{
 		return (packedZ >>> 28) & 0x3;
+	}
+
+	/**
+	 * Determine the checkpoint tiles of a server-sided path from this WorldPoint to another WorldPoint.
+	 * <p>
+	 * The checkpoint tiles of a path are the "corner tiles" of a path and determine the path completely.
+	 *
+	 * Note that true server-sided pathfinding uses collisiondata of the 128x128 area around this WorldPoint,
+	 * while the client only has access to collisiondata within the 104x104 loaded area.
+	 * This means that the results would differ in case the server's path goes near (or over) the border of the loaded area.
+	 *
+	 * @param client The client to compare in
+	 * @param other The other WorldPoint to compare with
+	 * @return Returns the checkpoint tiles of the path
+	 */
+	public List<WorldPoint> pathTo(Client client, WorldPoint other)
+	{
+		if (getPlane() != other.getPlane())
+		{
+			return null;
+		}
+
+		final LocalPoint sourceLp = LocalPoint.fromWorld(client, getX(), getY());
+		final LocalPoint targetLp = LocalPoint.fromWorld(client, other.getX(), other.getY());
+		if (sourceLp == null || targetLp == null)
+		{
+			return null;
+		}
+
+		int thisX = sourceLp.getSceneX();
+		int thisY = sourceLp.getSceneY();
+		int otherX = targetLp.getSceneX();
+		int otherY = targetLp.getSceneY();
+		int plane = getPlane();
+
+		final Tile[][][] tiles = client.getScene().getTiles();
+		final RS2Tile sourceTile = new RS2Tile(tiles[plane][thisX][thisY]);
+
+		final RS2Tile targetTile = new RS2Tile(tiles[plane][otherX][otherY]);
+		final List<RS2Tile> checkpointTiles = sourceTile.pathTo(targetTile.getTile());
+		if (checkpointTiles == null)
+		{
+			return null;
+		}
+		final List<WorldPoint> checkpointWPs = new ArrayList<>();
+		for (Tile checkpointTile : checkpointTiles)
+		{
+			if (checkpointTile == null)
+			{
+				break;
+			}
+			checkpointWPs.add(checkpointTile.getWorldLocation());
+		}
+		return checkpointWPs;
+	}
+
+	/**
+	 * Gets the path distance from this point to a WorldPoint.
+	 * <p>
+	 * If the other point is unreachable, this method will return {@link Integer#MAX_VALUE}.
+	 *
+	 * @param client
+	 * @param other
+	 * @return Returns the path distance
+	 */
+	public int distanceToPath(Client client, WorldPoint other)
+	{
+		final List<WorldPoint> checkpointWPs = this.pathTo(client, other);
+		if (checkpointWPs == null)
+		{
+			// No path found
+			return Integer.MAX_VALUE;
+		}
+
+		final WorldPoint destinationPoint = checkpointWPs.get(checkpointWPs.size() - 1);
+		if (other.getX() != destinationPoint.getX() || other.getY() != destinationPoint.getY())
+		{
+			// Path found but not to the requested tile
+			return Integer.MAX_VALUE;
+		}
+		WorldPoint Point1 = this.getWorldPoint();
+		int distance = 0;
+		for (WorldPoint Point2 : checkpointWPs)
+		{
+			distance += Point1.distanceTo2D(Point2);
+			Point1 = Point2;
+		}
+		return distance;
 	}
 
 	public void outline(Client client, Graphics2D graphics2D, Color color)

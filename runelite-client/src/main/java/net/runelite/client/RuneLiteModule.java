@@ -58,6 +58,7 @@ import net.runelite.client.menus.MenuManager;
 import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.plugins.openrl.OpenRuneLiteConfig;
 import net.runelite.client.plugins.openrl.Static;
+import net.runelite.client.plugins.openrl.api.movement.unethicalite.pathfinder.GlobalCollisionMap;
 import net.runelite.client.task.Scheduler;
 import net.runelite.client.util.DeferredEventBus;
 import net.runelite.client.util.ExecutorServiceExceptionLogger;
@@ -270,5 +271,12 @@ public class RuneLiteModule extends AbstractModule
 	OpenRuneLiteConfig provideOpenRuneLiteConfig(ConfigManager configManager)
 	{
 		return configManager.getConfig(OpenRuneLiteConfig.class);
+	}
+
+	@Provides
+	@Singleton
+	GlobalCollisionMap provideGlobalCollisionMap() throws IOException
+	{
+		return GlobalCollisionMap.loadFromResources();
 	}
 }

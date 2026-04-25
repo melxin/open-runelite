@@ -61,6 +61,9 @@ import net.runelite.client.plugins.openrl.api.rs2.wrappers.RS2TileObject;
 import net.runelite.client.plugins.openrl.api.rs2.wrappers.RS2WallObject;
 import net.runelite.client.plugins.openrl.api.rs2.wrappers.RS2Widget;
 import net.runelite.client.plugins.openrl.api.rs2.wrappers.api.SceneEntity;
+import net.runelite.client.plugins.openrl.plugins.devtools.utils.DrawUtils;
+import net.runelite.client.plugins.openrl.plugins.devtools.utils.RegionPoint;
+import net.runelite.client.plugins.openrl.plugins.devtools.utils.ScenePoint;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.OverlayUtil;
 import net.runelite.client.ui.overlay.tooltip.Tooltip;
@@ -213,12 +216,12 @@ public class EntityRenderer
 
 		if (path && currentPath != null)
 		{
-			DrawUtils.drawPath(g, currentPath);
+			DrawUtils.drawPath(g, currentPath, Color.GREEN);
 		}
 
 		if (collisionMap)
 		{
-			//DrawUtils.drawCollisions(g);
+			DrawUtils.drawCollisions(g);
 		}
 	}
 

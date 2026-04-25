@@ -23,8 +23,13 @@ import net.runelite.client.plugins.openrl.api.managers.InteractionManager;
 import net.runelite.client.plugins.openrl.api.managers.NeverLogoutManager;
 import net.runelite.client.plugins.openrl.api.managers.GameDataCachedManager;
 import net.runelite.client.plugins.openrl.api.managers.QuestManager;
+import net.runelite.client.plugins.openrl.api.managers.RegionManager;
+import net.runelite.client.plugins.openrl.api.movement.unethicalite.pathfinder.CollisionMap;
+import net.runelite.client.plugins.openrl.api.movement.unethicalite.pathfinder.GlobalCollisionMap;
 import net.runelite.client.plugins.openrl.api.plugin.LoopedPluginManager;
 import net.runelite.client.plugins.openrl.api.reflection.Reflection;
+import net.runelite.client.plugins.openrl.plugins.devtools.EntityRenderer;
+import net.runelite.client.plugins.openrl.plugins.walker.WalkerConfig;
 import net.runelite.client.ui.overlay.OverlayManager;
 
 @Singleton
@@ -126,4 +131,26 @@ public class Static
 	{
 		return RuneLite.getInjector();
 	}
+
+	@Inject
+	@Getter
+	private static EntityRenderer entityRenderer;
+
+	public static WalkerConfig getWalkerConfig()
+	{
+		return configManager.getConfig(WalkerConfig.class);
+	}
+
+	@Inject
+	private static GlobalCollisionMap globalCollisionMap;
+
+	public static CollisionMap getGlobalCollisionMap()
+	{
+		return getClient().isInInstancedRegion() ? globalCollisionMap.withLocalCollisions() : globalCollisionMap;
+		//return globalCollisionMap.withLocalCollisions();
+	}
+
+	@Inject
+	@Getter
+	private static RegionManager regionManager;
 }

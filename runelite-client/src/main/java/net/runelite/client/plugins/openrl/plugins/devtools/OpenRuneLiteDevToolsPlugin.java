@@ -1,15 +1,29 @@
 package net.runelite.client.plugins.openrl.plugins.devtools;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
 import com.google.inject.Provides;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.tuple.Pair;
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import net.runelite.api.Client;
+import net.runelite.api.MenuAction;
+import net.runelite.api.MenuEntry;
+import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.ConfigButtonClicked;
 import net.runelite.api.events.MenuOpened;
 import net.runelite.api.events.MenuOptionClicked;
 import net.runelite.api.events.WidgetClosed;
 import net.runelite.api.events.WidgetLoaded;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
@@ -18,6 +32,14 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.openrl.api.events.Draw;
 import net.runelite.client.plugins.openrl.api.events.MenuAutomated;
+import net.runelite.client.plugins.openrl.api.game.MessageUtils;
+import net.runelite.client.plugins.openrl.api.movement.unethicalite.pathfinder.TransportLoader;
+import net.runelite.client.plugins.openrl.api.movement.unethicalite.pathfinder.model.dto.TransportDto;
+import net.runelite.client.plugins.openrl.api.movement.unethicalite.pathfinder.model.requirement.Requirements;
+import net.runelite.client.plugins.openrl.api.rs2.providers.entities.RS2TileObjects;
+import net.runelite.client.plugins.openrl.api.rs2.providers.scene.RS2Tiles;
+import net.runelite.client.plugins.openrl.api.rs2.wrappers.RS2Tile;
+import net.runelite.client.plugins.openrl.api.rs2.wrappers.RS2TileObject;
 import net.runelite.client.ui.overlay.OverlayManager;
 
 @PluginDescriptor(
@@ -34,11 +56,11 @@ public class OpenRuneLiteDevToolsPlugin extends Plugin
 	@Inject
 	private OpenRuneLiteDevToolsOverlay overlay;
 
-	//@Inject
-	//private RegionOverlay regionOverlay;
+	@Inject
+	private RegionOverlay regionOverlay;
 
-	//@Inject
-	//private InteractionOverlay interactionOverlay;
+	@Inject
+	private InteractionOverlay interactionOverlay;
 
 	@Inject
 	private MemoryUsageOverlay memoryUsageOverlay;
@@ -55,33 +77,33 @@ public class OpenRuneLiteDevToolsPlugin extends Plugin
 	//@Inject
 	//private InputManager inputManager;
 
-	/*private WorldPoint sourceTile;
+	private WorldPoint sourceTile;
 	private Pair<String, Integer> transportObject;
 	private boolean selectingSource = true;
 	private boolean selectingDestination;
 	private boolean selectingObject;
-	private ArrayList<TransportDto> tempTransports;*/
+	private ArrayList<TransportDto> tempTransports;
 
 	@Override
 	public void startUp()
 	{
 		overlayManager.add(overlay);
-		//overlayManager.add(regionOverlay);
-		//overlayManager.add(interactionOverlay);
+		overlayManager.add(regionOverlay);
+		overlayManager.add(interactionOverlay);
 		overlayManager.add(memoryUsageOverlay);
 
-		//eventBus.register(regionOverlay);
+		eventBus.register(regionOverlay);
 	}
 
 	@Override
 	public void shutDown()
 	{
 		overlayManager.remove(overlay);
-		//overlayManager.remove(regionOverlay);
-		//overlayManager.remove(interactionOverlay);
+		overlayManager.remove(regionOverlay);
+		overlayManager.remove(interactionOverlay);
 		overlayManager.remove(memoryUsageOverlay);
 
-		//eventBus.unregister(regionOverlay);
+		eventBus.unregister(regionOverlay);
 	}
 
 	@Provides
@@ -111,16 +133,16 @@ public class OpenRuneLiteDevToolsPlugin extends Plugin
 	@Subscribe
 	public void onMenuOpened(MenuOpened e)
 	{
-		/*if (config.transportCreator())
+		if (config.transportCreator())
 		{
 			createTransportMenuOptions(e);
-		}*/
+		}
 	}
 
-	/*private void createTransportMenuOptions(MenuOpened e)
+	private void createTransportMenuOptions(MenuOpened e)
 	{
 		boolean validTile = false;
-		Map<String, TileObject> objectOptions = new HashMap<>(3);
+		final Map<String, RS2TileObject> objectOptions = new HashMap<>(3);
 		for (MenuEntry entry : e.getMenuEntries())
 		{
 			if (entry.getType().equals(MenuAction.WALK))
@@ -133,9 +155,8 @@ public class OpenRuneLiteDevToolsPlugin extends Plugin
 				{
 					continue;
 				}
-				String target = entry.getTarget().replaceFirst("<.*>", "");
-				RS2TileObject obj = RS2TileObjects.getNearest(RS2Tiles.getHoveredTile().getWorldLocation(),
-					target);
+				final String target = entry.getTarget().replaceFirst("<.*>", "");
+				final RS2TileObject obj = RS2TileObjects.getNearest(RS2Tiles.getHoveredTile().getWorldLocation(), target);
 				if (obj != null)
 				{
 					objectOptions.put(entry.getOption(), obj);
@@ -187,7 +208,7 @@ public class OpenRuneLiteDevToolsPlugin extends Plugin
 					{
 						return;
 					}
-					TransportDto transport = new TransportDto(
+					final TransportDto transport = new TransportDto(
 						sourceTile,
 						WorldPoint.fromLocalInstance(client, clickPoint.getLocalLocation()),
 						transportObject.getKey(),
@@ -245,20 +266,20 @@ public class OpenRuneLiteDevToolsPlugin extends Plugin
 
 	private void exportTransports()
 	{
-		Gson gson = new GsonBuilder().setPrettyPrinting().create();
-		StringBuilder output = new StringBuilder();
+		final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+		final StringBuilder output = new StringBuilder();
 		for (TransportDto transportDto : tempTransports)
 		{
-			JsonObject transportObj = gson.toJsonTree(transportDto).getAsJsonObject();
+			final JsonObject transportObj = gson.toJsonTree(transportDto).getAsJsonObject();
 			transportObj.add("requirements", new JsonObject());
-			String transport = gson.toJson(transportObj);
+			final String transport = gson.toJson(transportObj);
 			output.append(transport).append(",\n");
 		}
-		Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-		StringSelection stringSelection = new StringSelection(output.toString());
+		final Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+		final StringSelection stringSelection = new StringSelection(output.toString());
 		clipboard.setContents(stringSelection, null);
 		MessageUtils.addMessage("Transports copied to clipboard!");
-	}*/
+	}
 
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked e)
@@ -306,7 +327,7 @@ public class OpenRuneLiteDevToolsPlugin extends Plugin
 		/*if ("staffLevel".equals(e.getKey()))
 		{
 			client.setStaffModLevel(Integer.parseInt(e.getNewValue()));
-		}
+		}*/
 
 		if ("useCreatedTransports".equals(e.getKey()))
 		{
@@ -318,7 +339,7 @@ public class OpenRuneLiteDevToolsPlugin extends Plugin
 			{
 				TransportLoader.clearTempTransports();
 			}
-		}*/
+		}
 	}
 
 	@Subscribe
@@ -349,22 +370,22 @@ public class OpenRuneLiteDevToolsPlugin extends Plugin
 	@Subscribe
 	private void onWidgetLoaded(WidgetLoaded widgetLoaded)
 	{
-		/*if (widgetLoaded.getGroupId() == WidgetInfo.WORLD_MAP_VIEW.getGroupId())
+		if (widgetLoaded.getGroupId() == InterfaceID.WORLDMAP)
 		{
 			overlayManager.remove(regionOverlay);
 			regionOverlay.swapLayer();
 			overlayManager.add(regionOverlay);
-		}*/
+		}
 	}
 
 	@Subscribe
 	private void onWidgetClosed(WidgetClosed widgetClosed)
 	{
-		/*if (widgetClosed.getGroupId() == WidgetInfo.WORLD_MAP_VIEW.getGroupId())
+		if (widgetClosed.getGroupId() == InterfaceID.WORLDMAP)
 		{
 			overlayManager.remove(regionOverlay);
 			regionOverlay.swapLayer();
 			overlayManager.add(regionOverlay);
-		}*/
+		}
 	}
 }
