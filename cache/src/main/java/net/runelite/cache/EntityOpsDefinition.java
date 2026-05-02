@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.EqualsAndHashCode;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.experimental.Accessors;
@@ -100,6 +101,7 @@ public class EntityOpsDefinition
 	}
 
 	@Data
+	@EqualsAndHashCode(callSuper = false)
 	public static class ConditionalOp extends Op
 	{
 		public int varpID;
@@ -119,6 +121,7 @@ public class EntityOpsDefinition
 	}
 
 	@Data
+	@EqualsAndHashCode(callSuper = false)
 	public static class ConditionalSubOp extends ConditionalOp
 	{
 		public int subID;

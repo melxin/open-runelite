@@ -85,7 +85,7 @@ enum Courses
 
 	Courses(double totalXp)
 	{
-		this(totalXp, -1, null);
+		this(totalXp, -1, (WorldPoint) null);
 	}
 
 	Courses(double totalXp, int regionId, WorldPoint... courseEndWorldPoints)
