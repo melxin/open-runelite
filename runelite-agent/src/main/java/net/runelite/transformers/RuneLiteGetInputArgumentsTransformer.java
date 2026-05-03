@@ -117,13 +117,28 @@ public class RuneLiteGetInputArgumentsTransformer implements ClassFileTransforme
 				mv = new MethodVisitor(Opcodes.ASM9, mv)
 				{
 					@Override
+					public void visitFieldInsn(int opcode, String owner, String name, String descriptor)
+					{
+						if (opcode == Opcodes.PUTFIELD && descriptor.equals("Ljava/lang/String;"))
+						{
+							log.info("Pushing empty string for field: {}.{} {}", owner, name, descriptor);
+							mv.visitLdcInsn("");
+							mv.visitFieldInsn(Opcodes.PUTFIELD, owner, name, descriptor);
+						}
+						else
+						{
+							super.visitFieldInsn(opcode, owner, name, descriptor);
+						}
+					}
+
+					@Override
 					public void visitCode()
 					{
 						mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
 						mv.visitLdcInsn("[GamePack] Attempted to get input arguments in method: " + className + "." + name);
 						mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
-						mv.visitInsn(Opcodes.RETURN);
-						mv.visitEnd();
+						//mv.visitInsn(Opcodes.RETURN);
+						//mv.visitEnd();
 					}
 				};
 				return mv;
