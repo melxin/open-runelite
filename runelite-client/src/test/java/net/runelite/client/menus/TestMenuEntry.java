@@ -49,14 +49,12 @@ public class TestMenuEntry implements MenuEntry
 	private boolean forceLeftClick;
 	@Setter
 	private int itemOp = -1;
-	@Setter
 	private int itemId = -1;
 	@Setter
 	private Widget widget;
 	@Setter
 	private Actor actor;
 	@Getter
-	@Setter
 	private int worldViewId;
 
 	@Override

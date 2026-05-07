@@ -22,7 +22,7 @@ Open RuneLite is a modified version of RuneLite designed to have minimal downtim
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/melxin/open-runelite.git
+git clone https://github.com/Orvian/open-runelite.git
 cd open-runelite
 ```
 
@@ -91,19 +91,19 @@ Build and run the shaded JAR in production mode:
 ```bash
 ./gradlew :client:shadowJar
 java -ea -jar runelite-client/build/libs/client-1.12.25-SNAPSHOT-shaded.jar
+chmod +x runelite-client/build/libs/client-1.12.27-SNAPSHOT-shaded.jar
 ```
 
 **Production mode automatically:**
-- Loads plugins from `~/.runelite/plugins/` (external plugins from the RuneLite plugin hub)
 - Loads all built-in core plugins
 - Uses your existing RuneLite configuration, settings, and profiles from `~/.runelite/`
 - Does NOT require the `--developer-mode` flag
 
-This is equivalent to running the default `RuneLite.java` main method and will use all your existing plugins from the standard `~/.runelite/plugins/` directory.
+**Note**: Open-runelite cannot load external plugins from the official RuneLite plugin hub due to missing verification infrastructure. To use external plugins, use development mode with sideloaded plugins (see below).
 
 #### Development Mode
 
-To enable developer tools and side-load custom plugins:
+To enable developer tools and use external plugins:
 
 ```bash
 ./gradlew :client:shadowJar
@@ -111,9 +111,19 @@ java -ea -jar runelite-client/build/libs/client-1.12.25-SNAPSHOT-shaded.jar --de
 ```
 
 **Development mode additionally:**
-- Loads plugins from `~/.runelite/sideloaded-plugins/` (for custom plugin development)
+- Loads plugins from `~/.runelite/sideloaded-plugins/` (bypasses plugin hub verification)
 - Enables developer tools and debugging features
 - Requires assertions to be enabled (`-ea`)
+
+**To use your existing external plugins in development mode:**
+
+```bash
+# Copy plugins from plugin hub directory to sideloaded directory
+cp ~/.runelite/plugins/*.jar ~/.runelite/sideloaded-plugins/
+
+# Then run in developer mode
+java -ea -jar runelite-client/build/libs/client-1.12.25-SNAPSHOT-shaded.jar --developer-mode
+```
 
 ## Using Side-Loaded Plugins
 

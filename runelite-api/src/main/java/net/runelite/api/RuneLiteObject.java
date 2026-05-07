@@ -215,6 +215,7 @@ public class RuneLiteObject extends RuneLiteObjectController
 	 * @deprecated Use {@link #getAnimationController} or {@link #getPoseAnimationController()}
 	 * followed by {@link AnimationController#getFrame()}.
 	 */
+	@Deprecated
 	public Animation getAnimation()
 	{
 		if (animationController != null)
