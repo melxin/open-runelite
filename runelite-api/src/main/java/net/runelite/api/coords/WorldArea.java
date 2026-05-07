@@ -1,27 +1,3 @@
-/*
- * Copyright (c) 2018, Woox <https://github.com/wooxsolo>
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *
- * 1. Redistributions of source code must retain the above copyright notice, this
- *    list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
 package net.runelite.api.coords;
 
 import java.util.ArrayList;
@@ -749,6 +725,106 @@ public class WorldArea
 	public WorldPoint toWorldPoint()
 	{
 		return new WorldPoint(x, y, plane);
+	}
+
+	/**
+	 * Calculates the next area that will be occupied if this area attempts
+	 * to move toward it by using the normal NPC travelling pattern.
+	 *
+	 * @param wv the worldview to calculate with
+	 * @param target the target area
+	 * @param stopAtMeleeDistance whether to stop at melee distance to the target
+	 * @return the next occupied area
+	 */
+	public WorldArea calculateNextTravellingPoint(WorldView wv, WorldArea target,
+		boolean stopAtMeleeDistance)
+	{
+		return calculateNextTravellingPoint(wv, target, stopAtMeleeDistance, x -> true);
+	}
+
+	/**
+	 * Calculates the next area that will be occupied if this area attempts
+	 * to move toward it by using the normal NPC travelling pattern.
+	 *
+	 * @param wv the worldview to calculate with
+	 * @param target the target area
+	 * @param stopAtMeleeDistance whether to stop at melee distance to the target
+	 * @param extraCondition an additional condition to perform when checking valid tiles,
+	 *                       such as performing a check for un-passable actors
+	 * @return the next occupied area
+	 */
+	public WorldArea calculateNextTravellingPoint(WorldView wv, WorldArea target,
+		boolean stopAtMeleeDistance, Predicate<? super WorldPoint> extraCondition)
+	{
+		if (plane != target.getPlane())
+		{
+			return null;
+		}
+
+		if (this.intersectsWith(target))
+		{
+			if (stopAtMeleeDistance)
+			{
+				// Movement is unpredictable when the NPC and actor stand on top of each other
+				return null;
+			}
+			else
+			{
+				return this;
+			}
+		}
+
+		int dx = target.x - this.x;
+		int dy = target.y - this.y;
+		Point axisDistances = getAxisDistances(target);
+		if (stopAtMeleeDistance && axisDistances.getX() + axisDistances.getY() == 1)
+		{
+			// NPC is in melee distance of target, so no movement is done
+			return this;
+		}
+
+		LocalPoint lp = LocalPoint.fromWorld(wv, x, y);
+		if (lp == null ||
+			lp.getSceneX() + dx < 0 || lp.getSceneX() + dy >= 104 ||
+			lp.getSceneY() + dx < 0 || lp.getSceneY() + dy >= 104)
+		{
+			// NPC is travelling out of the scene, so collision data isn't available
+			return null;
+		}
+
+		int dxSig = Integer.signum(dx);
+		int dySig = Integer.signum(dy);
+		if (stopAtMeleeDistance && axisDistances.getX() == 1 && axisDistances.getY() == 1)
+		{
+			// When it needs to stop at melee distance, it will only attempt
+			// to travel along the x axis when it is standing diagonally
+			// from the target
+			if (this.canTravelInDirection(wv, dxSig, 0, extraCondition))
+			{
+				return new WorldArea(x + dxSig, y, width, height, plane);
+			}
+		}
+		else
+		{
+			if (this.canTravelInDirection(wv, dxSig, dySig, extraCondition))
+			{
+				return new WorldArea(x + dxSig, y + dySig, width, height, plane);
+			}
+			else if (dx != 0 && this.canTravelInDirection(wv, dxSig, 0, extraCondition))
+			{
+				return new WorldArea(x + dxSig, y, width, height, plane);
+			}
+			else if (dy != 0 && Math.max(Math.abs(dx), Math.abs(dy)) > 1 &&
+				this.canTravelInDirection(wv, 0, dy, extraCondition))
+			{
+				// Note that NPCs don't attempts to travel along the y-axis
+				// if the target is <= 1 tile distance away
+				return new WorldArea(x, y + dySig, width, height, plane);
+			}
+		}
+
+		// The NPC is stuck
+		return this;
 	}
 
 	/**
