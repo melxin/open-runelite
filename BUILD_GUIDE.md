@@ -19,14 +19,7 @@ Open RuneLite is a modified version of RuneLite designed to have minimal downtim
 
 ## Building the Project
 
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/Orvian/open-runelite.git
-cd open-runelite
-```
-
-### 2. Build with Gradle
+### 1. Build with Gradle
 
 ```bash
 ./gradlew build
@@ -37,7 +30,7 @@ This will:
 - Run tests
 - Build the client JAR
 
-### 3. Build Specific Modules
+### 2. Build Specific Modules
 
 To build only specific modules:
 
@@ -50,6 +43,13 @@ To build only specific modules:
 
 # Build client module
 ./gradlew :client:build
+```
+
+**Force Complete Rebuild**: If Gradle shows "up-to-date" and doesn't generate all JAR files, force a clean rebuild:
+
+```bash
+# Force clean rebuild of client module (generates all JARs including shaded)
+./gradlew :client:clean :client:build
 ```
 
 ## Running the Project
@@ -90,8 +90,7 @@ Build and run the shaded JAR in production mode:
 
 ```bash
 ./gradlew :client:shadowJar
-java -ea -jar runelite-client/build/libs/client-1.12.25-SNAPSHOT-shaded.jar
-chmod +x runelite-client/build/libs/client-1.12.27-SNAPSHOT-shaded.jar
+java -ea -jar runelite-client/build/libs/client-*-shaded.jar
 ```
 
 **Production mode automatically:**
@@ -107,7 +106,7 @@ To enable developer tools and use external plugins:
 
 ```bash
 ./gradlew :client:shadowJar
-java -ea -jar runelite-client/build/libs/client-1.12.25-SNAPSHOT-shaded.jar --developer-mode
+java -ea -jar runelite-client/build/libs/client-*-shaded.jar --developer-mode
 ```
 
 **Development mode additionally:**
@@ -122,7 +121,7 @@ java -ea -jar runelite-client/build/libs/client-1.12.25-SNAPSHOT-shaded.jar --de
 cp ~/.runelite/plugins/*.jar ~/.runelite/sideloaded-plugins/
 
 # Then run in developer mode
-java -ea -jar runelite-client/build/libs/client-1.12.25-SNAPSHOT-shaded.jar --developer-mode
+java -ea -jar runelite-client/build/libs/client-*-shaded.jar --developer-mode
 ```
 
 ## Using Side-Loaded Plugins
@@ -145,7 +144,7 @@ cp /path/to/plugin.jar ~/.runelite/sideloaded-plugins/
 Then run the client with developer mode:
 
 ```bash
-java -ea -jar runelite-client/build/libs/client-1.12.25-SNAPSHOT-shaded.jar --developer-mode
+java -ea -jar runelite-client/build/libs/client-*-shaded.jar --developer-mode
 ```
 
 **Note**: Unlike devious-client, open-runelite does not support loading plugins from GitHub repositories or custom URLs. It only supports loading JAR files from the local sideloaded-plugins directory.

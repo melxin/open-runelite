@@ -73,11 +73,13 @@ import net.runelite.api.kit.KitType;
 import net.runelite.client.chat.ChatMessageBuilder;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.JagexColors;
 import net.runelite.client.ui.NavigationButton;
@@ -136,10 +138,16 @@ public class DevToolsPlugin extends Plugin
 	private ConfigManager configManager;
 
 	@Inject
+	private ClientThread clientThread;
+
+	@Inject
 	private ChatMessageManager chatMessageManager;
 
 	@Inject
 	private DevToolsConfig config;
+
+	@Inject
+	private PluginManager pluginManager;
 
 	private DevToolsButton players;
 	private DevToolsButton npcs;

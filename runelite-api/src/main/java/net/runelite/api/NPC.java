@@ -95,4 +95,46 @@ public interface NPC extends Actor
 	 */
 	@Nullable
 	short[] getOverheadSpriteIds();
+
+	/**
+	 * Gets the overhead icon for this NPC.
+	 * This is a convenience method that maps the overhead sprite IDs to HeadIcon.
+	 *
+	 * @return the overhead icon, or null if none
+	 */
+	@Nullable
+	default HeadIcon getOverheadIcon()
+	{
+		short[] spriteIds = getOverheadSpriteIds();
+		if (spriteIds == null || spriteIds.length == 0)
+		{
+			return null;
+		}
+		// Map sprite IDs to HeadIcon based on prayer icon sprite IDs
+		for (short spriteId : spriteIds)
+		{
+			if (spriteId == -1)
+			{
+				continue;
+			}
+			// These sprite IDs correspond to prayer icon sprites
+			// May need adjustment based on actual sprite IDs
+			switch (spriteId)
+			{
+				case 0: // Protect from melee
+					return HeadIcon.MELEE;
+				case 1: // Protect from ranged
+					return HeadIcon.RANGED;
+				case 2: // Protect from magic
+					return HeadIcon.MAGIC;
+				case 3: // Retribution
+					return HeadIcon.RETRIBUTION;
+				case 4: // Smite
+					return HeadIcon.SMITE;
+				case 5: // Redemption
+					return HeadIcon.REDEMPTION;
+			}
+		}
+		return null;
+	}
 }

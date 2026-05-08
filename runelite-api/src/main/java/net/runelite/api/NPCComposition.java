@@ -160,4 +160,19 @@ public interface NPCComposition extends ParamHolder
 	 * @return
 	 */
 	int[] getStats();
+
+	/**
+	 * Gets the overhead icon for this NPC.
+	 * This is a convenience method that maps the overhead sprite IDs to HeadIcon.
+	 *
+	 * @return the overhead icon, or null if none
+	 */
+	@Nullable
+	default HeadIcon getOverheadIcon()
+	{
+		// This is a placeholder - the actual implementation would need access to the sprite IDs
+		// which are not available in NPCComposition. This method is provided for API compatibility
+		// with plugins that expect it, but it should be implemented in the NPC class instead.
+		return null;
+	}
 }

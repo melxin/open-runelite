@@ -49,9 +49,11 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -69,6 +71,7 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.config.RuneLiteConfig;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ExternalPluginsChanged;
 import net.runelite.client.events.PluginChanged;
 import net.runelite.client.events.ProfileChanged;
 import net.runelite.client.task.Schedule;
@@ -96,6 +99,8 @@ public class PluginManager
 	private final Provider<GameEventManager> sceneTileManager;
 	private final List<Plugin> plugins = new CopyOnWriteArrayList<>();
 	private final List<Plugin> activePlugins = new CopyOnWriteArrayList<>();
+	private final List<Plugin> sideloadedPlugins = new CopyOnWriteArrayList<>();
+	private final Map<Plugin, ClassLoader> sideloadedPluginLoaders = new HashMap<>();
 
 	@Inject
 	@VisibleForTesting
@@ -299,7 +304,12 @@ public class PluginManager
 						.map(ClassInfo::load)
 						.collect(Collectors.toList());
 
-					loadPlugins(plugins, null);
+					List<Plugin> newPlugins = loadPlugins(plugins, null);
+					for (Plugin p : newPlugins)
+					{
+						sideloadedPlugins.add(p);
+						sideloadedPluginLoaders.put(p, classLoader);
+					}
 				}
 				catch (PluginInstantiationException | IOException ex)
 				{
@@ -307,6 +317,234 @@ public class PluginManager
 				}
 			}
 		}
+	}
+
+	public void reloadSideLoaded()
+	{
+		reloadSideLoaded(null);
+	}
+
+	public void reloadSideLoaded(Runnable onComplete)
+	{
+		reloadSideLoaded(null, onComplete);
+	}
+
+	public void reloadSideLoaded(List<String> selectedPlugins, Runnable onComplete)
+	{
+		log.info("Reloading side-loaded plugins only...");
+		if (!developerMode)
+		{
+			return;
+		}
+
+		// Run on background thread to avoid freezing UI with many plugins
+		new Thread(() ->
+		{
+			// Stop and unload active side-loaded plugins and close their classloaders
+			for (Plugin plugin : new ArrayList<>(sideloadedPlugins))
+			{
+				// Skip if selective reload is enabled and this plugin is not selected
+				if (selectedPlugins != null && !selectedPlugins.isEmpty())
+				{
+					String pluginName = getPluginFileName(plugin);
+					if (pluginName == null || !selectedPlugins.contains(pluginName))
+					{
+						continue;
+					}
+				}
+
+				try
+				{
+					if (activePlugins.contains(plugin))
+					{
+						SwingUtilities.invokeAndWait(() ->
+						{
+							try
+							{
+								stopPlugin(plugin);
+								log.debug("Stopped side-loaded plugin: {}", plugin.getClass().getSimpleName());
+							}
+							catch (PluginInstantiationException e)
+							{
+								log.error("Error stopping side-loaded plugin {}", plugin.getClass().getSimpleName(), e);
+							}
+						});
+					}
+				}
+				catch (InterruptedException | InvocationTargetException e)
+				{
+					log.error("Error stopping side-loaded plugin on EDT", e);
+					Thread.currentThread().interrupt();
+				}
+
+				// Remove from global plugin list
+				plugins.remove(plugin);
+				// Close and discard classloader so subsequent reloads pick fresh bytes
+				ClassLoader loader = sideloadedPluginLoaders.remove(plugin);
+				if (loader instanceof java.io.Closeable)
+				{
+					try
+					{
+						((java.io.Closeable) loader).close();
+					}
+					catch (Exception ignore)
+					{
+					}
+				}
+
+				// Remove from sideloaded list
+				sideloadedPlugins.remove(plugin);
+			}
+
+			// Clear the current record of side-loaded plugins and hint GC
+			try
+			{
+				System.gc();
+			}
+			catch (Throwable ignore)
+			{
+			}
+
+			// Re-discover and load side-loaded plugins
+			// If selective reload is enabled, only load the selected plugins
+			if (selectedPlugins != null && !selectedPlugins.isEmpty())
+			{
+				loadSelectedSideLoadPlugins(selectedPlugins);
+			}
+			else
+			{
+				loadSideLoadPlugins();
+			}
+
+			// Apply default configuration for newly loaded side-loaded plugins
+			// This ensures plugin configs are properly set up without overriding user settings
+			loadDefaultPluginConfiguration(sideloadedPlugins);
+
+			// Notify UI to rebuild plugin list so newly discovered plugins appear in Config panel
+			eventBus.post(new ExternalPluginsChanged());
+
+			// Start enabled side-loaded plugins on EDT
+			SwingUtilities.invokeLater(() ->
+			{
+				for (Plugin plugin : new ArrayList<>(sideloadedPlugins))
+				{
+					// Skip if selective reload is enabled and this plugin is not selected
+					if (selectedPlugins != null && !selectedPlugins.isEmpty())
+					{
+						String pluginName = getPluginFileName(plugin);
+						if (pluginName == null || !selectedPlugins.contains(pluginName))
+						{
+							continue;
+						}
+					}
+
+					if (isPluginEnabled(plugin))
+					{
+						try
+						{
+							startPlugin(plugin);
+							String src = "unknown";
+							try
+							{
+								src = String.valueOf(plugin.getClass().getProtectionDomain().getCodeSource().getLocation());
+							}
+							catch (Exception ignore)
+							{
+							}
+							log.debug("Started side-loaded plugin: {} from {} (loader={})",
+								plugin.getClass().getSimpleName(), src, plugin.getClass().getClassLoader());
+						}
+						catch (PluginInstantiationException e)
+						{
+							log.error("Error starting side-loaded plugin {}", plugin.getClass().getSimpleName(), e);
+						}
+					}
+					else
+					{
+						log.info("Skipping start of side-loaded plugin {}: not enabled", plugin.getClass().getSimpleName());
+					}
+				}
+
+				if (onComplete != null)
+				{
+					try
+					{
+						onComplete.run();
+					}
+					catch (Exception e)
+					{
+						log.warn("onComplete threw", e);
+					}
+				}
+			});
+		}, "Side-loaded Plugin Reload Thread").start();
+	}
+
+	private void loadSelectedSideLoadPlugins(List<String> selectedPlugins)
+	{
+		if (!developerMode)
+		{
+			return;
+		}
+
+		File[] files = SIDELOADED_PLUGINS.listFiles();
+		if (files == null)
+		{
+			return;
+		}
+
+		for (File f : files)
+		{
+			if (f.getName().endsWith(".jar"))
+			{
+				// Only load if this JAR is in the selected plugins list
+				if (!selectedPlugins.contains(f.getName()))
+				{
+					continue;
+				}
+
+				log.info("Side-loading plugin {}", f);
+
+				try
+				{
+					ClassLoader classLoader = new PluginClassLoader(f, getClass().getClassLoader());
+
+					List<Class<?>> plugins = ClassPath.from(classLoader)
+						.getAllClasses()
+						.stream()
+						.map(ClassInfo::load)
+						.collect(Collectors.toList());
+
+					List<Plugin> newPlugins = loadPlugins(plugins, null);
+					for (Plugin p : newPlugins)
+					{
+						sideloadedPlugins.add(p);
+						sideloadedPluginLoaders.put(p, classLoader);
+					}
+				}
+				catch (PluginInstantiationException | IOException ex)
+				{
+					log.error("error sideloading plugin {}", f.getName(), ex);
+				}
+			}
+		}
+	}
+
+	private String getPluginFileName(Plugin plugin)
+	{
+		try
+		{
+			String location = String.valueOf(plugin.getClass().getProtectionDomain().getCodeSource().getLocation());
+			if (location != null && !location.equals("null"))
+			{
+				// Extract just the filename from the full path
+				return location.substring(location.lastIndexOf('/') + 1);
+			}
+		}
+		catch (Exception ignore)
+		{
+		}
+		return null;
 	}
 
 	public List<Plugin> loadPlugins(List<Class<?>> plugins, BiConsumer<Integer, Integer> onPluginLoaded) throws PluginInstantiationException
