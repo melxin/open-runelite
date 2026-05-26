@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2026, Open-RuneLite
+ * Copyright (c) 2026, Orvian
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
