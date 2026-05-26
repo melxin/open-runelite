@@ -63,6 +63,8 @@ import net.runelite.client.menus.MenuManager;
 import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.plugins.openrl.OpenRuneLiteConfig;
 import net.runelite.client.plugins.openrl.Static;
+import net.runelite.client.plugins.openrl.api.game.TickSnapshotManager;
+import net.runelite.client.plugins.openrl.api.managers.InteractionSafety;
 import net.runelite.client.plugins.openrl.api.movement.unethicalite.pathfinder.GlobalCollisionMap;
 import net.runelite.client.task.Scheduler;
 import net.runelite.client.util.DeferredEventBus;
@@ -158,6 +160,14 @@ public class RuneLiteModule extends AbstractModule
 		/**
 		 * Open RuneLite
 		 */
+
+		// Eager singleton — subscribes to GameTick immediately so TickSnapshot
+		// is populated before any plugin reads it.
+		bind(TickSnapshotManager.class).asEagerSingleton();
+
+		// Eager singleton — registers on EventBus immediately to catch GameStateChanged
+		// events before any interaction code runs.
+		bind(InteractionSafety.class).asEagerSingleton();
 
 		requestStaticInjection(
 			Static.class

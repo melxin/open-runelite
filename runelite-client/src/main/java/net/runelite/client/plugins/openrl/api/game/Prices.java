@@ -22,7 +22,7 @@ public class Prices
 			public Integer load(@NotNull Integer itemId)
 			{
 				logger.debug("Caching item {} price", itemId);
-				return GameThread.invokeLater(() -> Static.getItemManager().getItemPrice(itemId));
+				return GameThread.invokeAndWait(() -> Static.getItemManager().getItemPrice(itemId));
 			}
 		});
 

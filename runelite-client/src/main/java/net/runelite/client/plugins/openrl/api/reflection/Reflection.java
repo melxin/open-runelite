@@ -43,9 +43,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
-import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.EntityOps;
 import net.runelite.api.HeadIcon;
@@ -58,23 +55,33 @@ import net.runelite.api.WorldView;
 import net.runelite.client.plugins.openrl.Static;
 import net.runelite.client.plugins.openrl.api.commons.Rand;
 import net.runelite.client.plugins.openrl.api.input.Keyboard;
+import net.runelite.client.plugins.openrl.api.managers.InteractionSafety;
 
 // Helper source <https://github.com/chsami/Microbot/blob/main/runelite-client/src/main/java/net/runelite/client/plugins/microbot/util/reflection/Rs2Reflection.java>
 @Slf4j
 public class Reflection
 {
-	private static Method menuAction;
-	private static Object menuActionGarbageValue;
+	// All cached Method/Field references are made accessible once at cache time and never reset.
+	// volatile ensures safe publication across threads without full synchronization.
+	private static volatile Method menuAction;
+	private static volatile Object menuActionGarbageValue;
 
 	@SneakyThrows
 	public static void invokeMenuAction(int param0, int param1, int opcode, int identifier, int itemId, int worldViewId, String option, String target, int canvasX, int canvasY)
 	{
+		// Capture safety reference once. Null during early startup before static injection completes.
+		final InteractionSafety safety = Static.getInteractionSafety();
+		if (safety != null && !safety.isInteractionSafe())
+		{
+			log.warn("invokeMenuAction blocked — system not safe: {}", safety.getUnsafeReason());
+			return;
+		}
+
 		if (menuAction == null)
 		{
 			final int MENU_ACTION_ACCESS_FLAGS_VANILLA = (Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_FINAL);
-			final String MENU_ACTION_DESCRIPTOR_VANILLA_BYTE_GARBAGE_VALUE = "(IIIIIILjava/lang/String;Ljava/lang/String;IIB)V"; // This is with the garbage value, last byte
-			final String MENU_ACTION_DESCRIPTOR_VANILLA_INT_GARBAGE_VALUE = "(IIIIIILjava/lang/String;Ljava/lang/String;III)V"; // This is with the garbage value, last integer
-			final String MENU_ACTION_DESCRIPTOR_WITHOUT_GARBAGE_VALUE = "(IIIIIILjava/lang/String;Ljava/lang/String;II)V";
+			final String MENU_ACTION_DESCRIPTOR_VANILLA_BYTE_GARBAGE_VALUE = "(IIIIIILjava/lang/String;Ljava/lang/String;IIB)V";
+			final String MENU_ACTION_DESCRIPTOR_VANILLA_INT_GARBAGE_VALUE = "(IIIIIILjava/lang/String;Ljava/lang/String;III)V";
 			final String MENU_ACTION_DESCRIPTOR_RUNELITE = "(IILnet/runelite/api/MenuAction;IILjava/lang/String;Ljava/lang/String;)V";
 
 			final Class<?> clientClazz = Static.getClient().getClass();
@@ -82,7 +89,7 @@ public class Reflection
 			final ClassNode classNode = new ClassNode(Opcodes.ASM9);
 			classReader.accept(classNode, ClassReader.SKIP_FRAMES);
 
-			final MethodNode targetMethodNodeContainingMenuActionInvocation = classNode.methods.stream()
+			final MethodNode targetMethodNode = classNode.methods.stream()
 				.filter(m -> m.access == Opcodes.ACC_PUBLIC
 					&& (m.name.equals("menuAction") && m.desc.equals(MENU_ACTION_DESCRIPTOR_RUNELITE)
 					|| m.name.equals("openWorldHopper") && m.desc.equals("()V")
@@ -90,39 +97,56 @@ public class Reflection
 				.findFirst()
 				.orElse(null);
 
-			if (targetMethodNodeContainingMenuActionInvocation != null)
+			if (targetMethodNode != null)
 			{
-				final InsnList instructions = targetMethodNodeContainingMenuActionInvocation.instructions;
+				final InsnList instructions = targetMethodNode.instructions;
 				for (AbstractInsnNode insnNode : instructions)
 				{
-					if ((insnNode instanceof LdcInsnNode || (insnNode instanceof IntInsnNode)) && insnNode.getNext() instanceof MethodInsnNode)
+					if ((insnNode instanceof LdcInsnNode || insnNode instanceof IntInsnNode) && insnNode.getNext() instanceof MethodInsnNode)
 					{
+						Object garbageValue = null;
 						if (insnNode instanceof LdcInsnNode)
 						{
-							menuActionGarbageValue = ((LdcInsnNode) insnNode).cst;
+							garbageValue = ((LdcInsnNode) insnNode).cst;
 						}
-						else if (insnNode instanceof IntInsnNode)
+						else
 						{
-							if (insnNode.getOpcode() == Opcodes.BIPUSH)
+							final IntInsnNode intInsn = (IntInsnNode) insnNode;
+							if (intInsn.getOpcode() == Opcodes.BIPUSH)
 							{
-								menuActionGarbageValue = ((byte) ((IntInsnNode) insnNode).operand);
+								garbageValue = (byte) intInsn.operand;
 							}
-							else if (insnNode.getOpcode() == Opcodes.SIPUSH)
+							else if (intInsn.getOpcode() == Opcodes.SIPUSH)
 							{
-								menuActionGarbageValue = ((short) ((IntInsnNode) insnNode).operand);
+								garbageValue = (short) intInsn.operand;
 							}
 						}
 
 						final MethodInsnNode menuActionVanillaInsn = (MethodInsnNode) insnNode.getNext();
-						if (!menuActionVanillaInsn.desc.equals(MENU_ACTION_DESCRIPTOR_VANILLA_BYTE_GARBAGE_VALUE) && !menuActionVanillaInsn.desc.equals(MENU_ACTION_DESCRIPTOR_VANILLA_INT_GARBAGE_VALUE))
+						if (!menuActionVanillaInsn.desc.equals(MENU_ACTION_DESCRIPTOR_VANILLA_BYTE_GARBAGE_VALUE)
+							&& !menuActionVanillaInsn.desc.equals(MENU_ACTION_DESCRIPTOR_VANILLA_INT_GARBAGE_VALUE))
 						{
-							log.error("Menu action descriptor vanilla has changed from: {} or: {} to: {}", MENU_ACTION_DESCRIPTOR_VANILLA_BYTE_GARBAGE_VALUE, MENU_ACTION_DESCRIPTOR_VANILLA_INT_GARBAGE_VALUE, menuActionVanillaInsn.desc);
-							throw new RuntimeException("Menu action descriptor vanilla has changed to: " + menuActionVanillaInsn.desc);
+							log.error("Menu action descriptor vanilla has changed from: {} or: {} to: {}",
+								MENU_ACTION_DESCRIPTOR_VANILLA_BYTE_GARBAGE_VALUE,
+								MENU_ACTION_DESCRIPTOR_VANILLA_INT_GARBAGE_VALUE,
+								menuActionVanillaInsn.desc);
+							if (safety != null) safety.reportHookFailed("menuAction", InteractionSafety.HookSeverity.CRITICAL,
+								"vanilla descriptor changed to: " + menuActionVanillaInsn.desc);
+							break;
 						}
-						menuAction = Arrays.stream(Class.forName(menuActionVanillaInsn.owner).getDeclaredMethods())
+
+						final Method resolved = Arrays.stream(Class.forName(menuActionVanillaInsn.owner).getDeclaredMethods())
 							.filter(m -> m.getName().equals(menuActionVanillaInsn.name))
 							.findFirst()
 							.orElse(null);
+
+						if (resolved != null && garbageValue != null)
+						{
+							resolved.setAccessible(true);
+							menuAction = resolved;
+							menuActionGarbageValue = garbageValue;
+							if (safety != null) safety.reportHookResolved("menuAction", InteractionSafety.HookSeverity.CRITICAL);
+						}
 						break;
 					}
 				}
@@ -131,69 +155,85 @@ public class Reflection
 
 		if (menuAction == null || menuActionGarbageValue == null)
 		{
-			log.error("invokeMenuAction is broken!");
-			log.info("[PRESENT?] menuAction: {}, menuActionGarbageValue: {}", menuAction != null, menuActionGarbageValue != null);
-			log.warn("Falling back to runelite menuAction..");
+			if (safety != null) safety.reportHookFailed("menuAction", InteractionSafety.HookSeverity.CRITICAL,
+				"vanilla method not found after bytecode scan");
+			log.error("invokeMenuAction: vanilla method not found, falling back to RuneLite menuAction (worldViewId/canvasX/canvasY will be ignored)");
 			Static.getClientThread().invoke(() -> Static.getClient().menuAction(param0, param1, MenuAction.of(opcode), identifier, itemId, option, target));
 			return;
 		}
 
-		menuAction.setAccessible(true);
-		Static.getClientThread().runOnClientThreadOptional(() -> menuAction.invoke(null, param0, param1, opcode, identifier, itemId, worldViewId, option, target, canvasX, canvasY, menuActionGarbageValue));
-		menuAction.setAccessible(false);
-
-		if (Static.getClient().getKeyboardIdleTicks() > Rand.nextInt(5000, 10000))
+		final Method m = menuAction;
+		final Object gv = menuActionGarbageValue;
+		Static.getClientThread().runOnClientThreadOptional(() ->
 		{
-			log.info("[Keyboard idle] {} Pressing back space", Static.getClient().getKeyboardIdleTicks());
-			Keyboard.type((char) java.awt.event.KeyEvent.VK_BACK_SPACE);
-		}
+			try
+			{
+				m.invoke(null, param0, param1, opcode, identifier, itemId, worldViewId, option, target, canvasX, canvasY, gv);
+				if (safety != null) safety.reportInteractionSuccess();
+			}
+			catch (IllegalAccessException e)
+			{
+				// Hook became inaccessible — treat as a mapping change.
+				// Clear cache so the next call attempts re-discovery.
+				menuAction = null;
+				menuActionGarbageValue = null;
+				log.error("invokeMenuAction: IllegalAccessException — hook may be stale, cache cleared", e);
+				if (safety != null) safety.reportHookFailed("menuAction", InteractionSafety.HookSeverity.CRITICAL,
+					"IllegalAccessException: " + e.getMessage());
+			}
+			catch (InvocationTargetException e)
+			{
+				// The vanilla method was invoked correctly but the game threw.
+				// This may be a bad parameter or a transient game error — not necessarily a mapping change.
+				log.error("invokeMenuAction: invocation threw", e.getCause());
+				if (safety != null) safety.reportInteractionAttemptFailed("invokeMenuAction");
+			}
+
+			// Keyboard idle reset must happen on the client thread so the idle counter
+			// is read and acted on in the same tick that the menu action fires.
+			final int idleTicks = Static.getClient().getKeyboardIdleTicks();
+			if (idleTicks > Rand.nextInt(5000, 10000))
+			{
+				log.info("[Keyboard idle] {} ticks — pressing back space", idleTicks);
+				Keyboard.type((char) java.awt.event.KeyEvent.VK_BACK_SPACE);
+			}
+
+			return null;
+		});
 	}
 
-	/*@SneakyThrows
-	public static void invokeMenuAction(int param0, int param1, int opcode, int identifier, int itemId, int worldViewId, String option, String target, int canvasX, int canvasY)
-	{
-		log.info("[invokeMenuAction] param0: {}, param1: {}, opcode: {}, identifier: {}, itemId: {}, worldViewId: {}, option: {}, target: {}, canvasX: {}, canvasY: {}", param0, param1, opcode, identifier, itemId, worldViewId, option, target, canvasX, canvasY);
-		if (menuAction == null)
-		{
-			menuAction = Arrays.stream(Static.getClient().getClass().getDeclaredMethods())
-				.filter(m -> m.getReturnType().getName().equals("void") && m.getParameters().length == 10 && Arrays.stream(m.getParameters())
-					.anyMatch(p -> p.getType() == String.class))
-				.findFirst()
-				.orElse(null);
+	private static volatile Method setItemIdMethod;
 
-			if (menuAction == null)
-			{
-				log.error("invokeMenuAction is broken.. fall back to runelite menuAction");
-				Static.getClientThread().invoke(() -> Static.getClient().menuAction(param0, param1, MenuAction.of(opcode), identifier, itemId, option, target));
-				return;
-			}
-		}
-
-		menuAction.setAccessible(true);
-		Static.getClientThread().runOnClientThreadOptional(() -> menuAction.invoke(null, param0, param1, opcode, identifier, itemId, worldViewId, option, target, canvasX, canvasY));
-		if (Static.getClient().getKeyboardIdleTicks() > Rand.nextInt(5000, 10000))
-		{
-			log.info("[Keyboard idle] {} Pressing back space", Static.getClient().getKeyboardIdleTicks());
-			Keyboard.type((char) java.awt.event.KeyEvent.VK_BACK_SPACE);
-		}
-		menuAction.setAccessible(false);
-	}*/
-
-	@SneakyThrows
 	public static void setItemId(MenuEntry menuEntry, int itemId)
 	{
-		var list = Arrays.stream(menuEntry.getClass().getMethods())
-			.filter(x -> x.getName().equals("setItemId"))
-			.collect(Collectors.toList());
-
-		list.get(0).invoke(menuEntry, itemId); // use the setItemId method through reflection
+		try
+		{
+			if (setItemIdMethod == null)
+			{
+				final Method method = Arrays.stream(menuEntry.getClass().getMethods())
+					.filter(x -> x.getName().equals("setItemId"))
+					.findFirst()
+					.orElse(null);
+				if (method == null)
+				{
+					log.error("setItemId: method not found on MenuEntry");
+					return;
+				}
+				setItemIdMethod = method;
+			}
+			setItemIdMethod.invoke(menuEntry, itemId);
+		}
+		catch (IllegalAccessException | InvocationTargetException e)
+		{
+			log.error("setItemId failed", e);
+		}
 	}
 
-	private static Field entityOpsClassInstanceField; //  getfield nf.ev:oo
-	private static MethodInsnNode entityOpSetterMethodInsn; // invokevirtual/invokestatic oo.ay(ILjava/lang/String;I)V
-	private static Field entityOpsArrayListField; // getfield oo.aq:java.util.ArrayList
-	private static Class<?> entityOpsStringGetterClass; //  new np
-	private static Field entityOpStringGetterField; //  np var3 = (np)this.dj.aq.get(var2);
+	private static volatile Field entityOpsClassInstanceField;
+	private static volatile MethodInsnNode entityOpSetterMethodInsn;
+	private static volatile Field entityOpsArrayListField;
+	private static volatile Class<?> entityOpsStringGetterClass;
+	private static volatile Field entityOpStringGetterField;
 
 	@SneakyThrows
 	public static String[] getGroundItemActions(ItemComposition itemComposition)
@@ -204,26 +244,39 @@ public class Reflection
 			final ClassReader classReader = new ClassReader(itemCompositionClazz.getName());
 			final ClassNode classNode = new ClassNode(Opcodes.ASM9);
 			classReader.accept(classNode, ClassReader.SKIP_FRAMES);
-			final MethodNode init = classNode.methods.stream().filter(x -> x.name.equals("<init>")).findFirst().get();
-			final InsnList instructions = init.instructions;
-			for (AbstractInsnNode ain : instructions)
+
+			final MethodNode init = classNode.methods.stream()
+				.filter(x -> x.name.equals("<init>"))
+				.findFirst()
+				.orElse(null);
+
+			if (init == null)
+			{
+				log.error("getGroundItemActions: <init> not found in ItemComposition");
+				return new String[]{};
+			}
+
+			for (AbstractInsnNode ain : init.instructions)
 			{
 				if (ain instanceof FieldInsnNode && ain.getNext() != null && ain.getNext().getOpcode() == Opcodes.ICONST_2)
 				{
 					final FieldInsnNode fin = (FieldInsnNode) ain;
-					entityOpsClassInstanceField = Class.forName(fin.owner).getDeclaredField(fin.name);
+					final Field f = Class.forName(fin.owner).getDeclaredField(fin.name);
+					f.setAccessible(true);
+					entityOpsClassInstanceField = f;
 				}
-				else if ((ain.getOpcode() == Opcodes.INVOKEVIRTUAL || ain.getOpcode() == Opcodes.INVOKESTATIC) && ain instanceof MethodInsnNode && ((MethodInsnNode) ain).desc.endsWith("ILjava/lang/String;I)V"))
+				else if ((ain.getOpcode() == Opcodes.INVOKEVIRTUAL || ain.getOpcode() == Opcodes.INVOKESTATIC)
+					&& ain instanceof MethodInsnNode
+					&& ((MethodInsnNode) ain).desc.endsWith("ILjava/lang/String;I)V"))
 				{
-					final MethodInsnNode methodInsn = (MethodInsnNode) ain;
-					entityOpSetterMethodInsn = methodInsn;
+					entityOpSetterMethodInsn = (MethodInsnNode) ain;
 				}
 			}
 		}
 
 		if (entityOpsClassInstanceField == null || entityOpSetterMethodInsn == null)
 		{
-			log.error("getGroundItemActions is broken!");
+			log.error("getGroundItemActions: failed to locate entityOps instance or setter");
 			return new String[]{};
 		}
 
@@ -232,17 +285,28 @@ public class Reflection
 			final ClassReader classReader = new ClassReader(entityOpSetterMethodInsn.owner);
 			final ClassNode classNode = new ClassNode(Opcodes.ASM9);
 			classReader.accept(classNode, ClassReader.SKIP_FRAMES);
-			final MethodNode targetMethod = classNode.methods.stream().filter(x -> x.name.equals(entityOpSetterMethodInsn.name)).findFirst().get();
-			final InsnList instructions = targetMethod.instructions;
 
-			for (AbstractInsnNode ain : instructions)
+			final MethodNode targetMethod = classNode.methods.stream()
+				.filter(x -> x.name.equals(entityOpSetterMethodInsn.name))
+				.findFirst()
+				.orElse(null);
+
+			if (targetMethod == null)
+			{
+				log.error("getGroundItemActions: setter method {} not found", entityOpSetterMethodInsn.name);
+				return new String[]{};
+			}
+
+			for (AbstractInsnNode ain : targetMethod.instructions)
 			{
 				if (entityOpsArrayListField == null && ain.getOpcode() == Opcodes.GETFIELD && ain instanceof FieldInsnNode)
 				{
 					final FieldInsnNode fin = (FieldInsnNode) ain;
 					if (fin.desc.equals("Ljava/util/ArrayList;"))
 					{
-						entityOpsArrayListField = Class.forName(fin.owner).getDeclaredField(fin.name);
+						final Field f = Class.forName(fin.owner).getDeclaredField(fin.name);
+						f.setAccessible(true);
+						entityOpsArrayListField = f;
 					}
 				}
 				else if (entityOpsStringGetterClass == null && ain.getOpcode() == Opcodes.NEW && ain instanceof TypeInsnNode)
@@ -251,32 +315,33 @@ public class Reflection
 					if (typeInsn.desc.length() <= 3)
 					{
 						entityOpsStringGetterClass = Class.forName(typeInsn.desc);
-						entityOpStringGetterField = Arrays.stream(entityOpsStringGetterClass.getDeclaredFields()).filter(x -> x.getType() == String.class).findFirst().get();
+						final Field sf = Arrays.stream(entityOpsStringGetterClass.getDeclaredFields())
+							.filter(x -> x.getType() == String.class)
+							.findFirst()
+							.orElse(null);
+						if (sf != null)
+						{
+							sf.setAccessible(true);
+							entityOpStringGetterField = sf;
+						}
 					}
 				}
 			}
 		}
 
-		if (entityOpsArrayListField == null || entityOpsStringGetterClass == null || entityOpsClassInstanceField == null || entityOpStringGetterField == null)
+		if (entityOpsArrayListField == null || entityOpsStringGetterClass == null
+			|| entityOpsClassInstanceField == null || entityOpStringGetterField == null)
 		{
-			log.error("getGroundItemActions is broken!");
+			log.error("getGroundItemActions: one or more reflection fields could not be resolved");
 			return new String[]{};
 		}
 
-		entityOpsClassInstanceField.setAccessible(true);
 		final Object instance = entityOpsClassInstanceField.get(itemComposition);
-		entityOpsClassInstanceField.setAccessible(false);
-
-		entityOpsArrayListField.setAccessible(true);
 		final Object targetObject = entityOpsArrayListField.get(instance);
-		entityOpsClassInstanceField.setAccessible(false);
-
-		entityOpStringGetterField.setAccessible(true);
 
 		if (targetObject instanceof ArrayList)
 		{
 			final ArrayList<?> list = (ArrayList<?>) targetObject;
-
 			final String[] groundItemActions = new String[list.size()];
 			for (int i = 0; i < list.size(); ++i)
 			{
@@ -286,11 +351,9 @@ public class Reflection
 					groundItemActions[i] = (String) entityOpStringGetterField.get(actionBean);
 				}
 			}
-			entityOpStringGetterField.setAccessible(false);
 			return groundItemActions;
 		}
 
-		//return new String[]{null, null, "Take", null, null};
 		return new String[]{};
 	}
 
@@ -303,27 +366,37 @@ public class Reflection
 			final ClassReader classReader = new ClassReader(itemCompositionClazz.getName());
 			final ClassNode classNode = new ClassNode(Opcodes.ASM9);
 			classReader.accept(classNode, ClassReader.SKIP_FRAMES);
-			final MethodNode init = classNode.methods.stream().filter(x -> x.name.equals("<init>")).findFirst().get();
-			final InsnList instructions = init.instructions;
-			for (AbstractInsnNode ain : instructions)
+
+			final MethodNode init = classNode.methods.stream()
+				.filter(x -> x.name.equals("<init>"))
+				.findFirst()
+				.orElse(null);
+
+			if (init == null)
+			{
+				log.error("getGroundItemEntityOps: <init> not found in ItemComposition");
+				return null;
+			}
+
+			for (AbstractInsnNode ain : init.instructions)
 			{
 				if (ain instanceof FieldInsnNode && ain.getNext() != null && ain.getNext().getOpcode() == Opcodes.ICONST_2)
 				{
 					final FieldInsnNode fin = (FieldInsnNode) ain;
-					entityOpsClassInstanceField = Class.forName(fin.owner).getDeclaredField(fin.name);
+					final Field f = Class.forName(fin.owner).getDeclaredField(fin.name);
+					f.setAccessible(true);
+					entityOpsClassInstanceField = f;
 				}
 			}
 		}
 
 		if (entityOpsClassInstanceField == null)
 		{
-			log.error("getGroundItemEntityOps is broken!");
+			log.error("getGroundItemEntityOps: entityOps instance field not found");
 			return null;
 		}
 
-		entityOpsClassInstanceField.setAccessible(true);
 		final Object entityOpsClassInstance = entityOpsClassInstanceField.get(itemComposition);
-		entityOpsClassInstanceField.setAccessible(false);
 		if (entityOpsClassInstance instanceof EntityOps)
 		{
 			return (EntityOps) entityOpsClassInstance;
@@ -332,169 +405,86 @@ public class Reflection
 		return null;
 	}
 
-	/*@Deprecated(since = "Rev 237", forRemoval = true)
-	@SneakyThrows
-	public static String[] getGroundItemActions(ItemComposition item)
-	{
-		final List<Field> fields = Arrays.stream(item.getClass().getFields()).filter(x -> x.getType().isArray()).collect(Collectors.toList());
-		for (Field field : fields)
-		{
-			if (field.getType().getComponentType().getName().equals("java.lang.String"))
-			{
-				final String[] actions = (String[]) field.get(item);
-				if (Arrays.stream(actions).anyMatch(x -> x != null && x.equalsIgnoreCase("take")))
-				{
-					field.setAccessible(true);
-					return actions;
-				}
-			}
-		}
-		return new String[]{};
-	}*/
+	// @TODO Test if this works as intended
+	private static volatile Field baseXField;
+	private static volatile Field baseYField;
+	private static volatile Field viewportWalkingField;
 
 	/**
-	 * get animation id
-	 *
-	 * @TODO Remove this method
-	 * @param actor
-	 * @return uncensored animation id
-	 * @deprecated Will not work as of revision 232 use {@link Actor#getAnimation()} instead
+	 * Sets the scene destination used by the game for viewport walking.
+	 * Schedules execution on the client thread — safe to call from any thread.
 	 */
-	private static Field sequenceField;
-	private static int sequenceFieldMultiplierValue;
-
-	@Deprecated(since = "Rev 232", forRemoval = true)
-	public static int getAnimation(Actor actor)
-	{
-		try
-		{
-			if (sequenceField == null)
-			{
-				final Class<?> actorSubClazz = actor.getClass();
-				final Class<?> actorClazz = actorSubClazz.getSuperclass();
-				log.info("Actor class: {} | Actor sub class: {}", actorClazz.getName(), actorSubClazz.getName());
-				final ClassReader classReader = new ClassReader(actorClazz.getName());
-				final ClassNode classNode = new ClassNode(Opcodes.ASM9);
-				classReader.accept(classNode, ClassReader.SKIP_FRAMES);
-				final MethodNode getAnimationMethodNode = classNode.methods.stream()
-					.filter(m -> m.name.equals("getAnimation") && m.desc.equals("()I"))
-					.findFirst()
-					.orElse(null);
-				if (getAnimationMethodNode != null)
-				{
-					final InsnList instructions = getAnimationMethodNode.instructions;
-					for (AbstractInsnNode insnNode : instructions)
-					{
-						if (insnNode instanceof FieldInsnNode && ((FieldInsnNode) insnNode).desc.equals("I")
-							&& insnNode.getNext() instanceof LdcInsnNode)
-						{
-							final FieldInsnNode sequenceFieldInsn = (FieldInsnNode) insnNode;
-							final LdcInsnNode multiplierInsn = (LdcInsnNode) insnNode.getNext();
-							log.info("Found sequence field: {}.{} * {}", sequenceFieldInsn.owner, sequenceFieldInsn.name, multiplierInsn.cst);
-
-							sequenceField = actorClazz.getDeclaredField(sequenceFieldInsn.name);
-							sequenceFieldMultiplierValue = (int) multiplierInsn.cst;
-						}
-					}
-				}
-			}
-
-			if (sequenceField == null)
-			{
-				log.error("getAnimation method is broken!");
-				return -1;
-			}
-
-			sequenceField.setAccessible(true);
-			final int animationId = sequenceField.getInt(actor) * sequenceFieldMultiplierValue;
-			sequenceField.setAccessible(false);
-			log.info("Animation id: {}", animationId);
-			return animationId;
-		}
-		catch (Exception e)
-		{
-			log.error("Failed to get animation id", e);
-		}
-		return -1;
-	}
-
-	/**
-	 * @TODO Test if this works as intended
-	 */
-	private static Field baseXField;
-	private static Field baseYField;
-	private static Field viewportWalkingField;
-
 	public static void setDestination(int baseX, int baseY)
 	{
-		try
+		// Resolve fields on the client thread, then mutate on the client thread.
+		// Writing Scene fields from an off-thread context risks racing the game loop.
+		Static.getClientThread().invoke(() ->
 		{
-			final Client client = Static.getClient();
-			final WorldView worldView = client.getTopLevelWorldView();
-			final Scene scene = worldView.getScene();
-			if (baseXField == null || baseYField == null || viewportWalkingField == null)
+			try
 			{
-				final Class<? extends Scene> sceneClazz = scene.getClass();
-				final ClassReader classReader = new ClassReader(sceneClazz.getName());
-				final ClassNode classNode = new ClassNode(Opcodes.ASM9);
-				classReader.accept(classNode, ClassReader.SKIP_FRAMES);
+				final Client client = Static.getClient();
+				final WorldView worldView = client.getTopLevelWorldView();
+				final Scene scene = worldView.getScene();
 
-				final List<MethodNode> methods = classNode.methods;
-				for (MethodNode method : methods)
+				if (baseXField == null || baseYField == null || viewportWalkingField == null)
 				{
-					final InsnList instructions = method.instructions;
-					if (baseXField == null && method.name.equals("getBaseX"))
+					final Class<? extends Scene> sceneClazz = scene.getClass();
+					final ClassReader classReader = new ClassReader(sceneClazz.getName());
+					final ClassNode classNode = new ClassNode(Opcodes.ASM9);
+					classReader.accept(classNode, ClassReader.SKIP_FRAMES);
+
+					for (MethodNode method : classNode.methods)
 					{
-						final FieldInsnNode baseXFieldInsn = (FieldInsnNode) instructions.get(3);
-						log.info("baseX: {}.{}", baseXFieldInsn.owner, baseXFieldInsn.name);
-						baseXField = sceneClazz.getDeclaredField(baseXFieldInsn.name);
-					}
-					if (baseYField == null && method.name.equals("getBaseY"))
-					{
-						final FieldInsnNode baseYFieldInsn = (FieldInsnNode) instructions.get(3);
-						log.info("baseY: {}.{}", baseYFieldInsn.owner, baseYFieldInsn.name);
-						baseYField = sceneClazz.getDeclaredField(baseYFieldInsn.name);
-					}
-					if (viewportWalkingField == null && method.desc.equals("(Z)V"))
-					{
-						for (AbstractInsnNode insnNode : instructions)
+						final InsnList instructions = method.instructions;
+						if (baseXField == null && method.name.equals("getBaseX"))
 						{
-							if (insnNode.getOpcode() == Opcodes.ILOAD && insnNode.getNext() instanceof FieldInsnNode)
+							final FieldInsnNode fin = (FieldInsnNode) instructions.get(3);
+							log.info("baseX: {}.{}", fin.owner, fin.name);
+							final Field f = sceneClazz.getDeclaredField(fin.name);
+							f.setAccessible(true);
+							baseXField = f;
+						}
+						if (baseYField == null && method.name.equals("getBaseY"))
+						{
+							final FieldInsnNode fin = (FieldInsnNode) instructions.get(3);
+							log.info("baseY: {}.{}", fin.owner, fin.name);
+							final Field f = sceneClazz.getDeclaredField(fin.name);
+							f.setAccessible(true);
+							baseYField = f;
+						}
+						if (viewportWalkingField == null && method.desc.equals("(Z)V"))
+						{
+							for (AbstractInsnNode insnNode : instructions)
 							{
-								final FieldInsnNode viewportWalkingFieldInsn = (FieldInsnNode) insnNode.getNext();
-								viewportWalkingField = sceneClazz.getDeclaredField(viewportWalkingFieldInsn.name);
-								log.info("viewportWalking: {}.{} {}", viewportWalkingFieldInsn.owner, viewportWalkingFieldInsn.name, viewportWalkingFieldInsn.desc);
+								if (insnNode.getOpcode() == Opcodes.ILOAD && insnNode.getNext() instanceof FieldInsnNode)
+								{
+									final FieldInsnNode fin = (FieldInsnNode) insnNode.getNext();
+									log.info("viewportWalking: {}.{} {}", fin.owner, fin.name, fin.desc);
+									final Field f = sceneClazz.getDeclaredField(fin.name);
+									f.setAccessible(true);
+									viewportWalkingField = f;
+								}
 							}
 						}
 					}
 				}
-			}
 
-			if (baseXField != null && baseYField != null && viewportWalkingField != null)
+				if (baseXField != null && baseYField != null && viewportWalkingField != null)
+				{
+					baseXField.setInt(scene, baseX);
+					baseYField.setInt(scene, baseY);
+					viewportWalkingField.setBoolean(scene, true);
+				}
+			}
+			catch (IOException | NoSuchFieldException | IllegalAccessException e)
 			{
-				baseXField.setAccessible(true);
-				baseYField.setAccessible(true);
-				viewportWalkingField.setAccessible(true);
-
-				baseXField.setInt(scene, baseX);
-				baseYField.setInt(scene, baseY);
-				viewportWalkingField.setBoolean(scene, true);
-
-				baseXField.setAccessible(false);
-				baseXField.setAccessible(false);
-				viewportWalkingField.setAccessible(false);
+				log.error("setDestination failed", e);
 			}
-		}
-		catch (IOException | NoSuchFieldException | IllegalAccessException e)
-		{
-			log.error("Failed to set destination", e);
-		}
+		});
 	}
 
-	/**
-	 * @TODO Test if this works as intended
-	 */
-	private static Method getHeadIconSpriteIndexMethod;
+	// @TODO Test if this works as intended
+	private static volatile Method getHeadIconSpriteIndexMethod;
 
 	public static HeadIcon getHeadIcon(NPCComposition npcComposition)
 	{
@@ -506,12 +496,14 @@ public class Reflection
 				final ClassReader classReader = new ClassReader(npcCompositionClazz.getName());
 				final ClassNode classNode = new ClassNode(Opcodes.ASM9);
 				classReader.accept(classNode, ClassReader.SKIP_FRAMES);
-				final List<MethodNode> methods = classNode.methods;
-				for (MethodNode method : methods)
+
+				for (MethodNode method : classNode.methods)
 				{
 					if (method.desc.equals("(II)S"))
 					{
-						getHeadIconSpriteIndexMethod = npcCompositionClazz.getDeclaredMethod(method.name);
+						final Method resolved = npcCompositionClazz.getDeclaredMethod(method.name, int.class, int.class);
+						resolved.setAccessible(true);
+						getHeadIconSpriteIndexMethod = resolved;
 						break;
 					}
 				}
@@ -519,44 +511,49 @@ public class Reflection
 
 			if (getHeadIconSpriteIndexMethod == null)
 			{
-				log.error("getHeadIcon is broken!");
+				log.error("getHeadIcon: method with descriptor (II)S not found in NPCComposition");
 				return null;
 			}
 
-			getHeadIconSpriteIndexMethod.setAccessible(true);
-			final short headIconSpriteIndex = (short) getHeadIconSpriteIndexMethod.invoke(npcComposition, 0);
-			getHeadIconSpriteIndexMethod.setAccessible(false);
-			final HeadIcon headIcon = HeadIcon.values()[headIconSpriteIndex];
-			return headIcon;
+			final short headIconSpriteIndex = (short) getHeadIconSpriteIndexMethod.invoke(npcComposition, 0, 0);
+			return HeadIcon.values()[headIconSpriteIndex];
 		}
 		catch (IOException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e)
 		{
-			log.error("Failed to get head icon", e);
+			log.error("getHeadIcon failed", e);
 		}
 		return null;
 	}
 
-	public static Method setPrintMenuActionsMethod;
+	public static volatile Method setPrintMenuActionsMethod;
 
 	public static void setPrintMenuActions(boolean printMenuActions)
 	{
-		try
+		// Invoking a client method from off-thread risks racing the game loop.
+		// Schedule on the client thread unconditionally.
+		Static.getClientThread().invoke(() ->
 		{
-			final Client client = Static.getClient();
-			if (setPrintMenuActionsMethod == null)
+			try
 			{
-				setPrintMenuActionsMethod = Arrays.stream(client.getClass().getDeclaredMethods()).filter(x -> x.getName().equals("setPrintMenuActions")).findFirst().orElse(null);
+				final Client client = Static.getClient();
+				if (setPrintMenuActionsMethod == null)
+				{
+					setPrintMenuActionsMethod = Arrays.stream(client.getClass().getDeclaredMethods())
+						.filter(x -> x.getName().equals("setPrintMenuActions"))
+						.findFirst()
+						.orElse(null);
+				}
+				if (setPrintMenuActionsMethod == null)
+				{
+					log.error("setPrintMenuActions: method not found");
+					return;
+				}
+				setPrintMenuActionsMethod.invoke(client, printMenuActions);
 			}
-			if (setPrintMenuActionsMethod == null)
+			catch (IllegalAccessException | InvocationTargetException e)
 			{
-				log.error("setPrintMenuActions is broken!");
-				return;
+				log.error("setPrintMenuActions failed", e);
 			}
-			setPrintMenuActionsMethod.invoke(client, printMenuActions);
-		}
-		catch (IllegalAccessException | InvocationTargetException e)
-		{
-			log.error("Failed to set print menu actions", e);
-		}
+		});
 	}
 }

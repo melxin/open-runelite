@@ -108,7 +108,7 @@ public enum FairyRingLocation
 
 	public static String getCurrentCode()
 	{
-		return GameThread.invokeLater(() ->
+		return GameThread.invokeAndWait(() ->
 			CODES[0][Vars.getBit(Varbits.FAIRY_RING_DIAL_ADCB)]
 				+ CODES[1][Vars.getBit(Varbits.FAIRY_RIGH_DIAL_ILJK)]
 				+ CODES[2][Vars.getBit(Varbits.FAIRY_RING_DIAL_PSRQ)]

@@ -55,9 +55,6 @@ public class RS2Worlds
 			out.add(world);
 		});
 
-		// @TODO FIX
-		//Static.getClient().setWorldList(out.toArray(new World[0]));
-
 		return out;
 	}
 
@@ -218,19 +215,13 @@ public class RS2Worlds
 
 	public static boolean openLobbyWorlds()
 	{
-		// @TODO FIX
-		/*if (Static.getClient().loadWorlds())
-		{
-			Static.getClient().setWorldSelectOpen(true);
-			return true;
-		}*/
+		// loadWorlds/setWorldSelectOpen are not exposed by the RuneLite API
 		return false;
 	}
 
 	public static void closeLobbyWorlds()
 	{
-		// @TODO FIX
-		//Static.getClient().setWorldSelectOpen(false);
+		// setWorldSelectOpen is not exposed by the RuneLite API
 	}
 
 	public static boolean isHopperOpen()

@@ -71,7 +71,7 @@ public class TeleportLoader
 
 	private static List<Teleport> buildTimedTeleports()
 	{
-		return GameThread.invokeLater(() ->
+		return GameThread.invokeAndWait(() ->
 		{
 			final List<Teleport> teleports = new ArrayList<>();
 			if (RS2Worlds.inMembersWorld())

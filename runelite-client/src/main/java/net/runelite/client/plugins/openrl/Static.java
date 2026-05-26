@@ -20,6 +20,7 @@ import net.runelite.client.plugins.openrl.api.input.Keyboard;
 import net.runelite.client.plugins.openrl.api.input.Mouse;
 import net.runelite.client.plugins.openrl.api.input.naturalmouse.NaturalMouse;
 import net.runelite.client.plugins.openrl.api.managers.InteractionManager;
+import net.runelite.client.plugins.openrl.api.managers.InteractionSafety;
 import net.runelite.client.plugins.openrl.api.managers.NeverLogoutManager;
 import net.runelite.client.plugins.openrl.api.managers.GameDataCachedManager;
 import net.runelite.client.plugins.openrl.api.managers.QuestManager;
@@ -153,4 +154,8 @@ public class Static
 	@Inject
 	@Getter
 	private static RegionManager regionManager;
+
+	@Inject
+	@Getter
+	private static InteractionSafety interactionSafety;
 }

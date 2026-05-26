@@ -38,8 +38,10 @@ public class DefaultOvershootManager implements OvershootManager
 	{
 		double distanceToRealTarget = Math.hypot(distanceToRealTargetX, distanceToRealTargetY);
 
-		double randomModifier = distanceToRealTarget / overshootRandomModifierDivider;
-		//double speedPixelsPerSecond = distanceToRealTarget / mouseMovementMs * 1000; // TODO utilize speed
+		// Faster movements overshoot more — scale the random modifier by a speed factor capped at 2x
+		double speedPixelsPerSecond = mouseMovementMs > 0 ? distanceToRealTarget / mouseMovementMs * 1000 : 0;
+		double speedFactor = Math.min(speedPixelsPerSecond / 1000.0, 2.0);
+		double randomModifier = (distanceToRealTarget / overshootRandomModifierDivider) * (1.0 + speedFactor);
 		int x = (int) (random.nextDouble() * randomModifier - randomModifier / 2d) * overshootsRemaining;
 		int y = (int) (random.nextDouble() * randomModifier - randomModifier / 2d) * overshootsRemaining;
 		return new Point(x, y);

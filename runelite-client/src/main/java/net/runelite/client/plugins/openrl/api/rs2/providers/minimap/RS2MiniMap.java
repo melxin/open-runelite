@@ -280,42 +280,4 @@ public class RS2MiniMap
 		OverlayUtil.renderMinimapLocation(graphics, posOnMinimap, color);
 	}
 
-	// @TODO FIX/REMOVE
-	/*private static final int MINIMAP_WIDTH = 250;
-	private static final int MINIMAP_HEIGHT = 180;
-
-	private Rectangle getMinimap()
-	{
-		final RS2Widget minimap = RS2Widgets.get(WidgetInfo.FIXED_VIEWPORT_MINIMAP_DRAW_AREA);
-		if (RS2Widgets.isVisible(minimap))
-		{
-			return minimap.getWidget().getBounds();
-		}
-
-		final RS2Widget minimap1 = RS2Widgets.get(WidgetInfo.RESIZABLE_MINIMAP_DRAW_AREA);
-		if (RS2Widgets.isVisible(minimap1))
-		{
-			return minimap1.getWidget().getBounds();
-		}
-
-		final RS2Widget minimap2 = RS2Widgets.get(WidgetInfo.RESIZABLE_MINIMAP_STONES_DRAW_AREA);
-		if (RS2Widgets.isVisible(minimap2))
-		{
-			return minimap2.getWidget().getBounds();
-		}
-
-		final Rectangle bounds = Static.getClient().getCanvas().getBounds();
-		return new Rectangle(bounds.width - MINIMAP_WIDTH, 0, MINIMAP_WIDTH, MINIMAP_HEIGHT);
-	}
-
-	public boolean isClickInsideMinimap(java.awt.Point point)
-	{
-		return getMinimap().contains(point);
-	}
-
-	private boolean isClickOffScreen(java.awt.Point point)
-	{
-		return point.x < 0 || point.y < 0
-			|| point.x > Static.getClient().getViewportWidth() || point.y > Static.getClient().getViewportHeight();
-	}*/
 }

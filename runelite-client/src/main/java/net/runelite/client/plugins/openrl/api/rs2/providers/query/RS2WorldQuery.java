@@ -91,9 +91,6 @@ public class RS2WorldQuery extends AbstractQuery<World, RS2WorldQuery>
 			out.add(world);
 		});
 
-		// @TODO FIX
-		//Static.getClient().setWorldList(out.toArray(new World[0]));
-
 		return out;
 	}
 
