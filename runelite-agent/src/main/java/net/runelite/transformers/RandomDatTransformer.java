@@ -133,22 +133,19 @@ public class RandomDatTransformer implements ClassFileTransformer
 			final String prefix = className + "#" + method.name + "#" + method.desc;
 
 			// Identify write random dat methods
-			if (targetWriteRandomDatMethods.isEmpty())
+			if (method.desc.equals("([BI[BII)V"))
 			{
-				if (method.desc.equals("([BI[BII)V"))
+				if (!targetWriteRandomDatMethods.contains(prefix))
 				{
-					if (!targetWriteRandomDatMethods.contains(prefix))
-					{
-						log.info("Found write random dat method: {}.{} {}", classNode.name, method.name, method.desc);
-						targetWriteRandomDatMethods.add(prefix);
-					}
+					log.info("Found write random dat method: {}.{} {}", classNode.name, method.name, method.desc);
+					targetWriteRandomDatMethods.add(prefix);
 				}
 			}
 
 			// Identify get random dat methods
 			for (AbstractInsnNode insn : method.instructions)
 			{
-				if (insn instanceof FieldInsnNode && insn.getOpcode() == Opcodes.GETSTATIC && insn.getNext().getOpcode() == Opcodes.IFNULL)
+				if (insn instanceof FieldInsnNode && insn.getOpcode() == Opcodes.GETSTATIC)
 				{
 					final FieldInsnNode fin = (FieldInsnNode) insn;
 					if (fin.owner.equals(getRandomDatData.owner) && fin.name.equals(getRandomDatData.name) && fin.desc.equals(getRandomDatData.desc))
@@ -191,17 +188,17 @@ public class RandomDatTransformer implements ClassFileTransformer
 							mv.visitLabel(identificationsLabel);
 
 							mv.visitMethodInsn(Opcodes.INVOKESTATIC, CachedRandomDat.class.getName().replace(".", "/"), "getCachedRandomDat", "(Ljava/lang/String;)[B", false);
-							mv.visitVarInsn(Opcodes.ASTORE, 2); // Store cached byte[] data as local var 2
+							mv.visitVarInsn(Opcodes.ASTORE, 3); // Store cached byte[] data as local var 3
 
 							mv.visitLdcInsn("[GamePack] Using cached random.dat: ");
-							mv.visitVarInsn(Opcodes.ALOAD, 2); // byte[] data
+							mv.visitVarInsn(Opcodes.ALOAD, 3); // byte[] data
 							mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/util/Arrays", "toString", "([B)Ljava/lang/String;", false);
 							mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "concat", "(Ljava/lang/String;)Ljava/lang/String;", false);
 							mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
 							mv.visitInsn(Opcodes.SWAP); // Swap print stream below the message
 							mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
 							// Reference cached byte[] data & put
-							mv.visitVarInsn(Opcodes.ALOAD, 2);
+							mv.visitVarInsn(Opcodes.ALOAD, 3);
 							mv.visitFieldInsn(Opcodes.PUTSTATIC, getRandomDatData.owner, getRandomDatData.name, getRandomDatData.desc);
 						}
 					};
