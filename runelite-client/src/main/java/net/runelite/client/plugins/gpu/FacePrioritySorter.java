@@ -106,6 +106,7 @@ class FacePrioritySorter
 		final short[] faceTextures = model.getFaceTextures();
 
 		final byte[] transparencies = model.getFaceTransparencies();
+		final byte modelTransparency = model.getTransparency();
 		final byte[] bias = model.getFaceBias();
 
 		float orientSine = 0;
@@ -232,7 +233,7 @@ class FacePrioritySorter
 					}
 
 					int alphaBias = 0;
-					alphaBias |= transparencies != null ? (transparencies[faceIdx] & 0xff) << 24 : 0;
+					alphaBias |= faceTransparency(modelTransparency, transparencies != null ? transparencies[faceIdx] & 0xff : 0) << 24;
 					alphaBias |= bias != null ? (bias[faceIdx] & 0xff) << 16 : 0;
 					int texture = faceTextures != null ? faceTextures[faceIdx] + 1 : 0;
 
@@ -268,8 +269,9 @@ class FacePrioritySorter
 			{
 				for (char face = zsortHead[i]; face != (char) -1; face = zsortNext[face])
 				{
-					var b = transparencies != null && transparencies[face] != 0 ? alphaBuffer : opaqueBuffer;
-					b.put(vertexBuffer, face * FACE_SIZE, FACE_SIZE);
+					int offset = face * FACE_SIZE;
+					var b = (vertexBuffer[offset + 3] & 0xff000000) != 0 ? alphaBuffer : opaqueBuffer;
+					b.put(vertexBuffer, offset, FACE_SIZE);
 				}
 			}
 		}
@@ -346,8 +348,9 @@ class FacePrioritySorter
 				while (pri == 0 && currFaceDistance > avg12)
 				{
 					final int face = dynFaces[drawnFaces++];
-					var b = transparencies != null && transparencies[face] != 0 ? alphaBuffer : opaqueBuffer;
-					b.put(vertexBuffer, face * FACE_SIZE, FACE_SIZE);
+					int offset = face * FACE_SIZE;
+					var b = (vertexBuffer[offset + 3] & 0xff000000) != 0 ? alphaBuffer : opaqueBuffer;
+					b.put(vertexBuffer, offset, FACE_SIZE);
 
 					if (drawnFaces == numDynFaces && dynFaces != orderedFaces[11])
 					{
@@ -370,8 +373,9 @@ class FacePrioritySorter
 				while (pri == 3 && currFaceDistance > avg34)
 				{
 					final int face = dynFaces[drawnFaces++];
-					var b = transparencies != null && transparencies[face] != 0 ? alphaBuffer : opaqueBuffer;
-					b.put(vertexBuffer, face * FACE_SIZE, FACE_SIZE);
+					int offset = face * FACE_SIZE;
+					var b = (vertexBuffer[offset + 3] & 0xff000000) != 0 ? alphaBuffer : opaqueBuffer;
+					b.put(vertexBuffer, offset, FACE_SIZE);
 
 					if (drawnFaces == numDynFaces && dynFaces != orderedFaces[11])
 					{
@@ -394,8 +398,9 @@ class FacePrioritySorter
 				while (pri == 5 && currFaceDistance > avg68)
 				{
 					final int face = dynFaces[drawnFaces++];
-					var b = transparencies != null && transparencies[face] != 0 ? alphaBuffer : opaqueBuffer;
-					b.put(vertexBuffer, face * FACE_SIZE, FACE_SIZE);
+					int offset = face * FACE_SIZE;
+					var b = (vertexBuffer[offset + 3] & 0xff000000) != 0 ? alphaBuffer : opaqueBuffer;
+					b.put(vertexBuffer, offset, FACE_SIZE);
 
 					if (drawnFaces == numDynFaces && dynFaces != orderedFaces[11])
 					{
@@ -421,16 +426,18 @@ class FacePrioritySorter
 				for (int faceIdx = 0; faceIdx < priNum; ++faceIdx)
 				{
 					final int face = priFaces[faceIdx];
-					var b = transparencies != null && transparencies[face] != 0 ? alphaBuffer : opaqueBuffer;
-					b.put(vertexBuffer, face * FACE_SIZE, FACE_SIZE);
+					int offset = face * FACE_SIZE;
+					var b = (vertexBuffer[offset + 3] & 0xff000000) != 0 ? alphaBuffer : opaqueBuffer;
+					b.put(vertexBuffer, offset, FACE_SIZE);
 				}
 			}
 
 			while (currFaceDistance != -1000)
 			{
 				final int face = dynFaces[drawnFaces++];
-				var b = transparencies != null && transparencies[face] != 0 ? alphaBuffer : opaqueBuffer;
-				b.put(vertexBuffer, face * FACE_SIZE, FACE_SIZE);
+				int offset = face * FACE_SIZE;
+				var b = (vertexBuffer[offset + 3] & 0xff000000) != 0 ? alphaBuffer : opaqueBuffer;
+				b.put(vertexBuffer, offset, FACE_SIZE);
 
 				if (drawnFaces == numDynFaces && dynFaces != orderedFaces[11])
 				{
@@ -452,5 +459,21 @@ class FacePrioritySorter
 		}
 
 		return len;
+	}
+
+	private static int faceTransparency(byte modelTransparency, int faceTransparency)
+	{
+		if (modelTransparency == -1)
+		{
+			return 255;
+		}
+		int t = modelTransparency & 255;
+		if (t > 0 && faceTransparency < 253)
+		{
+			int a = (253 - faceTransparency) * t >> 8;
+			assert (faceTransparency & 255) == faceTransparency;
+			return faceTransparency + a;
+		}
+		return faceTransparency;
 	}
 }
