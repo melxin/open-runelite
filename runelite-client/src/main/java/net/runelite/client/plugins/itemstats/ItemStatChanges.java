@@ -115,6 +115,7 @@ public class ItemStatChanges
 		add(food(22), ItemID.MANTARAY, ItemID.BLIGHTED_MANTARAY, ItemID.DARK_CRAB, ItemID.POTATO_TUNA_SWEETCORN, ItemID.VAMPYRIUM_MYSTERY_JERKY);
 		add(food(23), ItemID.RAIDS_FISH6_COOKED, ItemID.RAIDS_BAT6_COOKED);
 		add(food(24), ItemID.MARLIN);
+		add(food(26), ItemID.STYMPHIKE_TARTARE);
 		add(new Anglerfish(), ItemID.ANGLERFISH, ItemID.BLIGHTED_ANGLERFISH);
 		add(food(maxHP -> (int) Math.ceil(maxHP * .06)), ItemID.STRAWBERRY);
 		add(food(maxHP -> (int) Math.ceil(maxHP * .05)), ItemID.WATERMELON_SLICE);
