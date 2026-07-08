@@ -934,6 +934,7 @@ public final class InterfaceID
 	public static final int EVENT_REWARDS = 927;
 	public static final int BALLOT = 928;
 	public static final int TUTORIAL_PLAYER_EXPERIENCE = 929;
+	public static final int SANGVESTI_WORLD_MAP = 930;
 	public static final int SAILING_BT_HUD = 931;
 	public static final int SAILING_BT_SELECTION = 932;
 	public static final int SAILING_BT_STATISTICS = 933;
@@ -30464,6 +30465,22 @@ public final class InterfaceID
 		public static final int BUTTON_EXPERIENCED = 0x03a1_0007;
 	}
 
+	public static final class SangvestiWorldMap
+	{
+		public static final int UNIVERSE = 0x03a2_0000;
+		public static final int CONTENTS = 0x03a2_0001;
+		public static final int FRAME = 0x03a2_0002;
+		public static final int BACKGROUND = 0x03a2_0003;
+		public static final int DRAG = 0x03a2_0004;
+		public static final int MAIN = 0x03a2_0005;
+		public static final int MAP = 0x03a2_0006;
+		public static final int MAP_GRAPHIC0 = 0x03a2_0007;
+		public static final int MAP_BACK = 0x03a2_0008;
+		public static final int MAP_FRONT = 0x03a2_0009;
+		public static final int CLOSE = 0x03a2_000a;
+		public static final int TOOLTIP = 0x03a2_000b;
+	}
+
 	public static final class SailingBtHud
 	{
 		public static final int UNIVERSE = 0x03a3_0000;
@@ -31328,6 +31345,7 @@ public final class InterfaceID
 		public static final int MAP_BACK = 0x03c7_000c;
 		public static final int MAP_FRONT = 0x03c7_000d;
 		public static final int CLOSE = 0x03c7_000e;
+		public static final int TOOLTIP = 0x03c7_000f;
 	}
 
 	public static final class Myq6IntegrityBar
