@@ -5947,6 +5947,7 @@ public final class DBTableID
 
 		public static final class Row
 		{
+			public static final int WOODCUTTING_RESOURCE_ENGORGED_BLOODWOOD_TREE = 510;
 			public static final int WOODCUTTING_RESOURCE_YEW_TREE = 3251;
 			public static final int WOODCUTTING_RESOURCE_YEW_TREE_FARMING_PATCH = 3252;
 			public static final int WOODCUTTING_RESOURCE_TEAK_TREE = 3256;

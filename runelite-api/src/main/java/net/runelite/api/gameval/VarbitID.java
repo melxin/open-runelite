@@ -10289,6 +10289,10 @@ public final class VarbitID
 	public static final int SANGVESTI_HINT_CLOTHES_SHOP = 15681;
 	public static final int SANGVESTI_HINT_FANCY_HOUSE_1 = 15682;
 	public static final int SANGVESTI_HINT_BLACKSMITH = 15683;
+	public static final int AFK_BLOODWOOD_TREE_PROGRESS = 15684;
+	public static final int AFK_BLOODWOOD_TREE_DRAINING = 15685;
+	public static final int CRIMSON_KISTEN_WARNING = 15686;
+	public static final int SAILING_PLAYER_TRAWLING_SHOAL_BAITED_STEP = 15687;
 	public static final int XMAS24_INVITE_CHARLIE = 15796;
 	public static final int XMAS24_INVITES = 15800;
 	public static final int XMAS24_MATCH_AMIK = 15892;
