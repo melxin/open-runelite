@@ -240,7 +240,6 @@ public final class InterfaceID
 	public static final int LEVELUP_DISPLAY = 233;
 	public static final int DEADMANLOOT = 234;
 	public static final int HOSIDIUS_SERVERY_HUD = 235;
-	public static final int HOSIDIUS_STRIP_REWARDS = 236;
 	public static final int GE_PRICELIST = 237;
 	public static final int GE_PRICECHECKER_SIDE = 238;
 	public static final int MUSIC = 239;
@@ -9251,51 +9250,6 @@ public final class InterfaceID
 		public static final int STEW_CONTAINER_RECT0 = 0x00eb_000d;
 		public static final int STEW_BAR = 0x00eb_000e;
 		public static final int TOOLTIP = 0x00eb_000f;
-	}
-
-	public static final class HosidiusStripRewards
-	{
-		public static final int UNIVERSE = 0x00ec_0000;
-		public static final int FRAME = 0x00ec_0001;
-		public static final int UNIVERSE_MODEL1 = 0x00ec_0002;
-		public static final int POINTS = 0x00ec_0003;
-		public static final int CAN_TEXT0 = 0x00ec_0004;
-		public static final int CAN_GRAPHIC1 = 0x00ec_0005;
-		public static final int CAN_TEXT = 0x00ec_0006;
-		public static final int ITEMS = 0x00ec_0007;
-		public static final int ITEMPRICES = 0x00ec_0008;
-		public static final int CAN = 0x00ec_0009;
-		public static final int SEEDBOX = 0x00ec_000a;
-		public static final int SEEDBOX_TITLE = 0x00ec_000b;
-		public static final int SEEDBOX_COST = 0x00ec_000c;
-		public static final int SEEDBOX_GFX = 0x00ec_000d;
-		public static final int HERBSACK = 0x00ec_000e;
-		public static final int AUTOWEED = 0x00ec_000f;
-		public static final int AUTOWEED_TITLE = 0x00ec_0010;
-		public static final int AUTOWEED_COST = 0x00ec_0011;
-		public static final int AUTOWEED_GFX = 0x00ec_0012;
-		public static final int AUTOWEED_INDICATOR = 0x00ec_0013;
-		public static final int OUTFIT = 0x00ec_0014;
-		public static final int OUTFIT_TITLE = 0x00ec_0015;
-		public static final int HAT = 0x00ec_0016;
-		public static final int HAT_TITLE = 0x00ec_0017;
-		public static final int HAT_COST = 0x00ec_0018;
-		public static final int HAT_GFX = 0x00ec_0019;
-		public static final int TORSO = 0x00ec_001a;
-		public static final int TORSO_TITLE = 0x00ec_001b;
-		public static final int TORSO_COST = 0x00ec_001c;
-		public static final int TORSO_GFX = 0x00ec_001d;
-		public static final int LEGS = 0x00ec_001e;
-		public static final int LEG_TITLE = 0x00ec_001f;
-		public static final int LEG_COST = 0x00ec_0020;
-		public static final int LEG_GFX = 0x00ec_0021;
-		public static final int FEET = 0x00ec_0022;
-		public static final int FEET_TITLE = 0x00ec_0023;
-		public static final int FEET_COST = 0x00ec_0024;
-		public static final int FEET_GFX = 0x00ec_0025;
-		public static final int HERBSACK_TITLE = 0x00ec_0026;
-		public static final int HERBSACK_COST = 0x00ec_0027;
-		public static final int HERBSACK_GFX = 0x00ec_0028;
 	}
 
 	public static final class GePricelist

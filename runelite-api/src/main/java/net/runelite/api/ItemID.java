@@ -5880,8 +5880,10 @@ public final class ItemID
 	public static final int UNFINISHED_BATTA_9484 = 9484;
 	public static final int HALF_MADE_BATTA_9485 = 9485;
 	public static final int UNFINISHED_BATTA_9486 = 9486;
-	public static final int WIZARD_BLIZZARD_9487 = 9487;
-	public static final int WIZARD_BLIZZARD_9489 = 9489;
+	public static final int COCKTAIL_GLASS_9487 = 9487;
+	public static final int COCKTAIL_GLASS_9488 = 9488;
+	public static final int COCKTAIL_GLASS_9489 = 9489;
+	public static final int COCKTAIL_GLASS_9490 = 9490;
 	public static final int WIZARD_BLIZZARD_9508 = 9508;
 	public static final int SHORT_GREEN_GUY_9510 = 9510;
 	public static final int PINEAPPLE_PUNCH_9512 = 9512;
