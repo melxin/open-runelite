@@ -31,6 +31,7 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.AdviceAdapter;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
@@ -188,17 +189,18 @@ public class RandomDatTransformer implements ClassFileTransformer
 							mv.visitLabel(identificationsLabel);
 
 							mv.visitMethodInsn(Opcodes.INVOKESTATIC, CachedRandomDat.class.getName().replace(".", "/"), "getCachedRandomDat", "(Ljava/lang/String;)[B", false);
-							mv.visitVarInsn(Opcodes.ASTORE, 3); // Store cached byte[] data as local var 3
+							final int newLocalVarIndex = newLocal(Type.getType("[B]"));
+							mv.visitVarInsn(Opcodes.ASTORE, newLocalVarIndex); // Store cached byte[] data as local var
 
 							mv.visitLdcInsn("[GamePack] Using cached random.dat: ");
-							mv.visitVarInsn(Opcodes.ALOAD, 3); // byte[] data
+							mv.visitVarInsn(Opcodes.ALOAD, newLocalVarIndex); // byte[] data
 							mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/util/Arrays", "toString", "([B)Ljava/lang/String;", false);
 							mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/String", "concat", "(Ljava/lang/String;)Ljava/lang/String;", false);
 							mv.visitFieldInsn(Opcodes.GETSTATIC, "java/lang/System", "out", "Ljava/io/PrintStream;");
 							mv.visitInsn(Opcodes.SWAP); // Swap print stream below the message
 							mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/io/PrintStream", "println", "(Ljava/lang/String;)V", false);
 							// Reference cached byte[] data & put
-							mv.visitVarInsn(Opcodes.ALOAD, 3);
+							mv.visitVarInsn(Opcodes.ALOAD, newLocalVarIndex);
 							mv.visitFieldInsn(Opcodes.PUTSTATIC, getRandomDatData.owner, getRandomDatData.name, getRandomDatData.desc);
 						}
 					};
