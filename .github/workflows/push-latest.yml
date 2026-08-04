@@ -43,18 +43,21 @@ jobs:
           FILE_NAME=$(basename "$FILE_PATH")
           FILE_SIZE=$(stat -c%s "$FILE_PATH")
           SHA256_HASH=$(sha256sum "$FILE_PATH" | awk '{ print $1 }')
-          echo "{\"file_name\": \"$FILE_NAME\", \"sha256\": \"$SHA256_HASH\", \"size\": $FILE_SIZE}" > /home/runner/work/open-runelite/open-runelite/runelite-client/build/checksums.json
+          echo "{\"file_name\": \"$FILE_NAME\", \"sha256\": \"$SHA256_HASH\", \"size\": $FILE_SIZE}" > /home/runner/work/open-runelite/open-runelite/runelite-client/build/libs/checksums.json
 
-      - name: Create Release
-        uses: "marvinpinto/action-automatic-releases@latest"
-        with:
-          repo_token: "${{ secrets.REPO_PAT }}"
-          automatic_release_tag: "latest"
-          prerelease: false
-          title: "Latest"
-          files: |
-            /home/runner/work/open-runelite/open-runelite/runelite-client/build/libs/client-*-shaded.jar
-            /home/runner/work/open-runelite/open-runelite/runelite-client/build/checksums.json
+      - name: Push to hosting
+        run: |
+          git clone https://github.com/melxin/open-runelite-hosting.git
+          mkdir -p ./open-runelite-hosting/release
+          cp /home/runner/work/open-runelite/open-runelite/runelite-client/build/libs/checksums.json ./open-runelite-hosting/release/
+          cp /home/runner/work/open-runelite/open-runelite/runelite-client/build/libs/client-*-shaded.jar ./open-runelite-hosting/release/
+          cd open-runelite-hosting
+
+          git config --global user.email "melxin@tutamail.com"
+          git config --global user.name "Github Actions"
+          git add -A
+          git commit -m 'Auto release - Client (Latest)'
+          git push https://melxin:${{ secrets.REPO_PAT }}@github.com/melxin/open-runelite-hosting.git master
 
   checkstyleMain:
     name: Checkstyle main
